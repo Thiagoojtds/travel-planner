@@ -1,0 +1,215 @@
+datasource db {
+  provider = "sqlite"
+  url      = "file:../data/app.db"
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Truck {
+  id                    String   @id @default(uuid())
+  plate                 String   @default("BRA2E19")
+  model                 String   @default("Iveco Stralis")
+  brand                 String   @default("Iveco")
+  trailerModel          String   @default("Carreta Randon")
+  trailerPlate          String   @default("ABC1D23")
+  year                  Int      @default(2018)
+  currentKm             Float    @default(0)
+  fuelCapacityPrincipal Float    @default(600)
+  fuelCapacityAuxiliar  Float    @default(300)
+  avgConsumption        Float    @default(2.2)
+  driverName            String   @default("Motorista")
+  driverTripPay         Float    @default(700.0)
+  oilChangeIntervalKm   Float    @default(20000)
+  lastOilChangeKm       Float    @default(0)
+  monthlyTargetRevenue  Float    @default(35000)
+  monthlyTargetProfit   Float    @default(12000)
+  status                String   @default("disponivel")
+  createdAt             DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+}
+
+model Freight {
+  id               String    @id @default(uuid())
+  code             String    @unique
+  originCity       String
+  originState      String
+  destCity         String
+  destState        String
+  returnCity       String?
+  returnState      String?
+  routeType        String?   @default("ida_volta")
+  waypoints        String?
+  client           String
+  cargoType        String
+  cargoWeightTons  Float
+  distanceKm       Float
+  departureDate    String
+  deliveryDate     String
+  receiptDate      String
+  grossValue       Float
+  advanceValue     Float
+  balanceDue       Float
+  driverPay        Float     @default(700.0)
+  status           String    @default("planejado")
+  paymentStatus    String    @default("pendente")
+  notes            String?
+  carrierContract  String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  fuelings         Fueling[]
+  expenses         Expense[]
+}
+
+model Fueling {
+  id            String    @id @default(uuid())
+  date          String
+  currentKm     Float
+  liters        Float
+  pricePerLiter Float
+  totalAmount   Float
+  tank          String    @default("ambos") // principal_600, auxiliar_300, ambos
+  status        String    @default("pago") // pago, pendente
+  city          String?
+  state         String?
+  notes         String?
+  freightId     String?
+  freight       Freight?  @relation(fields: [freightId], references: [id], onDelete: SetNull)
+  expenses      Expense[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Expense {
+  id                String             @id @default(uuid())
+  type              String             @default("saida")
+  category          String
+  description       String
+  amount            Float
+  date              String
+  paymentMethod     String             @default("pix")
+  status            String             @default("pago")
+  freightId         String?
+  freight           Freight?           @relation(fields: [freightId], references: [id], onDelete: SetNull)
+  fuelingId         String?
+  fueling           Fueling?           @relation(fields: [fuelingId], references: [id], onDelete: Cascade)
+  debtId            String?
+  debt              Debt?              @relation(fields: [debtId], references: [id], onDelete: SetNull)
+  fixedExpenseId    String?
+  fixedExpense      FixedExpense?      @relation(fields: [fixedExpenseId], references: [id], onDelete: SetNull)
+  installmentNumber Int?
+  creditCardInvoiceId String?
+  creditCardInvoice   CreditCardInvoice? @relation(fields: [creditCardInvoiceId], references: [id], onDelete: Cascade)
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+}
+
+model Debt {
+  id                   String    @id @default(uuid())
+  title                String
+  creditor             String?
+  totalOriginalAmount  Float
+  remainingBalance     Float
+  totalInstallments       Int
+  paidInstallments        Int       @default(0)
+  initialPaidInstallments Int       @default(0)
+  installmentAmount       Float
+  interestRate            Float     @default(0)
+  dueDay                  Int
+  status                  String    @default("ativo")
+  startDate               String?
+  settledAt               String?
+  category                String
+  notes                   String?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  payments             Expense[]
+}
+
+model FixedExpense {
+  id            String    @id @default(uuid())
+  description   String
+  category      String
+  amount        Float
+  dueDay        Int
+  paymentMethod String    @default("pix")
+  beneficiary   String?
+  active        Boolean   @default(true)
+  notes         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  expenses      Expense[]
+}
+
+model Maintenance {
+  id                 String   @id @default(uuid())
+  type               String   @default("preventiva")
+  category           String
+  description        String
+  maintenanceKm      Float
+  nextRecommendedKm  Float?
+  date               String
+  workshop           String?
+  partsCost          Float    @default(0)
+  laborCost          Float    @default(0)
+  totalCost          Float
+  partsReplaced      String?
+  invoiceNumber      String?
+  notes              String?
+  createdAt          DateTime @default(now())
+  updatedAt          DateTime @updatedAt
+}
+
+model Checklist {
+  id                    String   @id @default(uuid())
+  date                  String
+  truckKm               Float
+  status                String   @default("aprovado")
+  driverName            String
+  oilLevel              Boolean  @default(true)
+  coolantLevel          Boolean  @default(true)
+  visibleLeaks          Boolean  @default(false)
+  lightsAndTires        Boolean  @default(true)
+  brakesOk              Boolean  @default(true)
+  trailerCouplingRandon Boolean  @default(true)
+  notes                 String?
+  createdAt             DateTime @default(now())
+}
+
+model AppConfig {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
+model CreditCardInvoice {
+  id          String                  @id @default(uuid())
+  cardName    String
+  month       String                  // "YYYY-MM"
+  dueDate     String                  // "YYYY-MM-DD"
+  closingDate String?                 // "YYYY-MM-DD"
+  status      String                  @default("pendente") // "pendente", "pago"
+  notes       String?
+  createdAt   DateTime                @default(now())
+  updatedAt   DateTime                @updatedAt
+  items       CreditCardInvoiceItem[]
+  expenses    Expense[]
+}
+
+model CreditCardInvoiceItem {
+  id                 String            @id @default(uuid())
+  invoiceId          String
+  invoice            CreditCardInvoice @relation(fields: [invoiceId], references: [id], onDelete: Cascade)
+  description        String
+  category           String            @default("outros")
+  amount             Float             // Valor da parcela nesta fatura
+  totalAmount        Float?            // Valor total da compra original
+  purchaseDate       String            // "YYYY-MM-DD"
+  currentInstallment Int               @default(1)
+  totalInstallments  Int               @default(1)
+  parentPurchaseId   String?           // Id compartilhado entre todas as parcelas da mesma compra
+  notes              String?
+  createdAt          DateTime          @default(now())
+  updatedAt          DateTime          @updatedAt
+}

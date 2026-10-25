@@ -1,0 +1,37 @@
+# Dependências
+node_modules/
+.venv/
+
+# Build do frontend
+dist/
+tsconfig.tsbuildinfo
+
+# Variáveis de ambiente sensíveis
+.env
+.env.local
+.env.*.local
+
+# Banco de dados e dados locais da aplicação (sensíveis)
+data/*
+!data/.gitkeep
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Arquivos de sistema e temporários
+.DS_Store
+Thumbs.db
+*.Zone.Identifier
+
+# Pacotes temporários de deploy manual
+deploy.tar.gz

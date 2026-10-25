@@ -1,0 +1,90 @@
+{
+  "version": "1.0.0",
+  "description": "Catálogo de Referência de Habilidades (Skills) para indexação rápida e prevenção de estouro de contexto (token overflow).",
+  "skills": [
+    {
+      "id": "freight-management",
+      "name": "Gestão e Simulação de Fretes",
+      "path": ".agent/skills/freight-management/SKILL.md",
+      "triggers": [
+        "frete",
+        "viagem",
+        "simulador",
+        "pedagio",
+        "distancia",
+        "cliente",
+        "carga",
+        "cnh",
+        "entrada automatica",
+        "7 dias uteis"
+      ],
+      "summary": "Cadastro de fretes, simulação de ida/retorno vazio, cálculo de pedágio/diesel e automação de entrada financeira com recebimento padrão em 7 dias úteis."
+    },
+    {
+      "id": "financial-expenses",
+      "name": "Gestão Financeira, Diesel e Contas a Pagar",
+      "path": ".agent/skills/financial-expenses/SKILL.md",
+      "triggers": [
+        "despesa",
+        "gasto",
+        "diesel",
+        "abastecimento",
+        "gasto fixo",
+        "restante a pagar",
+        "contas a pagar",
+        "pendente",
+        "fluxo de caixa"
+      ],
+      "summary": "Controle de despesas operacionais, abastecimentos de diesel integrados como saídas, gastos fixos mensais (financiamento, seguros, sascar) e apuração do restante a pagar."
+    },
+    {
+      "id": "truck-maintenance",
+      "name": "Manutenção Mecânica e Checklist Diário",
+      "path": ".agent/skills/truck-maintenance/SKILL.md",
+      "triggers": [
+        "manutencao",
+        "oleo",
+        "troca de oleo",
+        "revisao",
+        "compressor",
+        "oficina",
+        "checklist",
+        "km",
+        "odometro"
+      ],
+      "summary": "Controle de odômetro, intervalo de troca de óleo (20.000 km), alerta de vencimento, manutenções parceladas com lançamento automático em despesas e checklist."
+    },
+    {
+      "id": "dashboard-analytics",
+      "name": "Dashboard Analítico e Agrupamento Mensal",
+      "path": ".agent/skills/dashboard-analytics/SKILL.md",
+      "triggers": [
+        "dashboard",
+        "agrupamento mensal",
+        "filtro fornecedor",
+        "filtro datas",
+        "fechamento mensal",
+        "kpis",
+        "grafico"
+      ],
+      "summary": "Visão mensal consolidada, apuração de quanto resta para pagamento todo mês, filtros dinâmicos por fornecedor e intervalo de datas, gráficos de evolução e distribuição de gastos."
+    },
+    {
+      "id": "code-standards",
+      "name": "Padrões de Código e UI/UX",
+      "path": ".agent/skills/code-standards/SKILL.md",
+      "triggers": [
+        "css",
+        "layout",
+        "componente",
+        "modal",
+        "tabela",
+        "estilo",
+        "typescript",
+        "responsivo",
+        "nowrap"
+      ],
+      "summary": "Diretrizes técnicas: React 18 + TS, CSS Vanilla com glassmorphism, tabelas com white-space nowrap, retenção de rascunhos ao clicar fora de modais e build sem erros."
+    }
+  ]
+}

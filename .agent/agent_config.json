@@ -1,0 +1,46 @@
+{
+  "$schema": "https://antigravity.google/schemas/agent_config.v1.json",
+  "name": "TravelPlannerAgent",
+  "description": "Agente especialista para o sistema TransFrete - Gestão Operacional de Fretes, Caminhão Scania R 450 e Controle Financeiro Mensal.",
+  "version": "1.0.0",
+  "model_config": {
+    "primary_model": "gemini-3.1-pro",
+    "fallback_model": "gemini-3-flash",
+    "temperature": 0.2,
+    "top_p": 0.95,
+    "max_output_tokens": 8192,
+    "thinking_budget": 2048
+  },
+  "execution_rules": {
+    "auto_compact_context": true,
+    "preserve_documentation_integrity": true,
+    "progressive_disclosure": true,
+    "validate_typescript_before_complete": true,
+    "prevent_data_loss_on_modal_click_outside": true
+  },
+  "context_paths": {
+    "skills_directory": ".agent/skills",
+    "skills_index": ".agent/skills_index.json",
+    "rules_directory": ".agent/rules",
+    "workflows_directory": ".agent/workflows",
+    "mcp_config": ".agent/mcp_config.json"
+  },
+  "project_context": {
+    "project_name": "Travel Planner - TransFrete Gestão de Fretes",
+    "stack": {
+      "framework": "React 18 + Vite 5",
+      "language": "TypeScript",
+      "styling": "Vanilla CSS (Design System próprio com glassmorphism)",
+      "state_management": "React Context (AppContext.tsx) + localStorage"
+    },
+    "truck_profile": {
+      "model": "Iveco Stralis 6x2",
+      "plate": "BRA-2E19",
+      "oil_change_interval_km": 20000,
+      "avg_consumption_kml": 2.2,
+      "fuel_capacity_liters": 900,
+      "primary_driver": "Motorista Principal",
+      "primary_client": "Transportadora Parceira"
+    }
+  }
+}

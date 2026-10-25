@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.gitignore
+.venv
+.agent
+.agents
+.spec
+*.log
+.env
+data/*.db
+data/backups

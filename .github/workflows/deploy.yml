@@ -1,0 +1,52 @@
+name: Deploy to VPS
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    name: Deploy TransFrete Pro to VPS
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Deploy via SSH
+        uses: appleboy/ssh-action@v1.2.0
+        with:
+          host: ${{ secrets.VPS_HOST }}
+          username: ${{ secrets.VPS_USER }}
+          key: ${{ secrets.VPS_SSH_KEY }}
+          port: ${{ secrets.VPS_PORT || 22 }}
+          script: |
+            set -e
+            APP_DIR="${{ secrets.VPS_TARGET_DIR }}"
+            
+            echo "🚀 Iniciando deploy em: $APP_DIR"
+            
+            # Se a pasta não existir ou não for um repo git, clona o projeto
+            if [ ! -d "$APP_DIR/.git" ]; then
+              echo "📦 Clonando repositório na VPS..."
+              mkdir -p "$APP_DIR"
+              git clone https://github.com/${{ github.repository }}.git "$APP_DIR"
+            fi
+
+            cd "$APP_DIR"
+
+            echo "🔄 Atualizando código da branch principal..."
+            git fetch --all
+            git reset --hard origin/${{ github.ref_name }}
+
+            echo "📁 Garantindo diretório de dados persistentes..."
+            mkdir -p data
+
+            echo "🐳 Reconstruindo e reiniciando containers Docker..."
+            docker compose down || true
+            docker compose up -d --build
+
+            echo "🧹 Limpando imagens docker não utilizadas..."
+            docker image prune -f
+
+            echo "✅ Deploy concluído com sucesso!"

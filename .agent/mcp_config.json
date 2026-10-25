@@ -1,0 +1,25 @@
+{
+  "mcpServers": {
+    "filesystem-helper": {
+      "command": "node",
+      "args": [
+        "-e",
+        "console.log('MCP FileSystem Provider Active')"
+      ],
+      "env": {
+        "PROJECT_ROOT": "."
+      }
+    },
+    "freight-pricing-tools": {
+      "command": "node",
+      "args": [
+        "-e",
+        "console.log('MCP Freight Pricing Provider Active')"
+      ],
+      "env": {
+        "DEFAULT_BASE_STATION": "Curitiba/PR",
+        "ANTT_TABLE_ACTIVE": "true"
+      }
+    }
+  }
+}
