@@ -29,7 +29,7 @@ import { FuelingModal } from './components/modals/FuelingModal';
 import { UnifiedFinancialModal, FinancialModalType } from './components/modals/UnifiedFinancialModal';
 
 const AppContent: React.FC = () => {
-  const { isAuthenticated, isChecking } = useAuth();
+  const { isAuthenticated, isChecking, isDemoMode } = useAuth();
   const { activeTab } = useApp();
 
   const [isFreightModalOpen, setIsFreightModalOpen] = useState(false);
@@ -129,6 +129,21 @@ const AppContent: React.FC = () => {
     <div className="flex h-screen w-screen overflow-hidden bg-slate-950 text-slate-100 font-sans">
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+        {isDemoMode && (
+          <div className="bg-gradient-to-r from-amber-500/15 via-sky-500/15 to-purple-500/15 border-b border-amber-500/30 px-3.5 sm:px-6 py-2 flex items-center justify-between text-xs shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500 text-slate-950 uppercase tracking-wider">
+                Modo Demonstração (Portfólio)
+              </span>
+              <span className="text-slate-300 hidden sm:inline">
+                Você está navegando com <strong>dados fictícios simulados</strong>. Sinta-se à vontade para testar as funcionalidades!
+              </span>
+            </div>
+            <span className="text-[11px] font-mono text-amber-400 font-semibold">
+              PIN 1234
+            </span>
+          </div>
+        )}
         <Header
           title={currentMeta.title}
           subtitle={currentMeta.subtitle}

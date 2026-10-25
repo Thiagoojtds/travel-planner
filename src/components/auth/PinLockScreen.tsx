@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Lock, KeyRound, Truck, AlertCircle } from 'lucide-react';
+import { KeyRound, Truck, AlertCircle, Sparkles } from 'lucide-react';
 import { useAuth } from '../../context/AuthContext';
 
 export const PinLockScreen: React.FC = () => {
@@ -25,17 +25,23 @@ export const PinLockScreen: React.FC = () => {
     setError(null);
   };
 
-  const handleSubmit = async (e?: React.FormEvent) => {
+  const handleSubmit = async (e?: React.FormEvent, customPin?: string) => {
     if (e) e.preventDefault();
-    if (!pin) return;
+    const pinToSubmit = customPin || pin;
+    if (!pinToSubmit) return;
     setLoading(true);
     setError(null);
-    const success = await login(pin);
+    const success = await login(pinToSubmit);
     if (!success) {
       setError('PIN incorreto. Tente novamente.');
       setPin('');
     }
     setLoading(false);
+  };
+
+  const handleQuickDemoAccess = () => {
+    setPin('1234');
+    handleSubmit(undefined, '1234');
   };
 
   return (
@@ -118,9 +124,25 @@ export const PinLockScreen: React.FC = () => {
           {loading ? 'Validando...' : 'Acessar Sistema'}
         </button>
 
-        <p className="text-[11px] text-slate-500 mt-4">
-          PIN padrão inicial: <span className="text-slate-400 font-mono">1234</span>
-        </p>
+        {/* Card de Acesso de Demonstração para Portfólio */}
+        <div className="mt-5 p-3 rounded-xl bg-slate-800/40 border border-slate-700/50 text-[11px] text-slate-400 text-left">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-slate-300 flex items-center gap-1.5">
+              <Sparkles className="w-3.5 h-3.5 text-amber-400" />
+              Acesso Portfólio / Teste
+            </span>
+            <button
+              type="button"
+              onClick={handleQuickDemoAccess}
+              className="px-2 py-0.5 rounded text-[10px] font-bold bg-amber-500/15 text-amber-400 border border-amber-500/30 hover:bg-amber-500/25 transition-colors"
+            >
+              Testar Agora (1234)
+            </button>
+          </div>
+          <p className="text-slate-400 mt-1">
+            Digite <strong className="text-amber-400 font-mono">1234</strong> para navegar livremente com dados simulados.
+          </p>
+        </div>
       </div>
     </div>
   );

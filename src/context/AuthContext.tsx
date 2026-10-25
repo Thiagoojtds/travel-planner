@@ -3,6 +3,7 @@ import { api, getAuthPin, setAuthPin, clearAuthPin } from '../services/api';
 
 interface AuthContextType {
   isAuthenticated: boolean;
+  isDemoMode: boolean;
   isChecking: boolean;
   login: (pin: string) => Promise<boolean>;
   logout: () => void;
@@ -13,13 +14,15 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [isAuthenticated, setIsAuthenticated] = useState<boolean>(false);
+  const [isDemoMode, setIsDemoMode] = useState<boolean>(false);
   const [isChecking, setIsChecking] = useState<boolean>(true);
 
   const verifyPin = async (pinToTest: string): Promise<boolean> => {
     try {
-      const res = await api.post<{ success: boolean }>('/auth/verify', { pin: pinToTest });
+      const res = await api.post<{ success: boolean; mode?: 'demo' | 'production' }>('/auth/verify', { pin: pinToTest });
       if (res.success) {
         setAuthPin(pinToTest);
+        setIsDemoMode(res.mode === 'demo' || pinToTest === '1234');
         setIsAuthenticated(true);
         return true;
       }
@@ -53,6 +56,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const logout = () => {
     clearAuthPin();
     setIsAuthenticated(false);
+    setIsDemoMode(false);
   };
 
   const changePin = async (currentPin: string, newPin: string) => {
@@ -61,7 +65,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ isAuthenticated, isChecking, login, logout, changePin }}>
+    <AuthContext.Provider value={{ isAuthenticated, isDemoMode, isChecking, login, logout, changePin }}>
       {children}
     </AuthContext.Provider>
   );
