@@ -30,10 +30,10 @@ jobs:
             mkdir -p "$APP_DIR"
             cd "$APP_DIR"
 
-            # Se ainda não for repositório git, inicializa com segurança mesmo que a pasta já contenha arquivos (ex: .env, data/)
+            # Se ainda não for repositório git, inicializa no diretório existente
             if [ ! -d ".git" ]; then
               echo "📦 Inicializando Git no diretório existente..."
-              git init -b "$BRANCH" || git init
+              git init
               git config --global --add safe.directory "$APP_DIR" || true
               git remote add origin "$REPO_URL" 2>/dev/null || git remote set-url origin "$REPO_URL"
             else
@@ -41,10 +41,10 @@ jobs:
               git remote set-url origin "$REPO_URL"
             fi
 
-            echo "🔄 Puxando alterações da branch $BRANCH..."
+            echo "🔄 Sincronizando código com a branch $BRANCH..."
             git fetch origin "$BRANCH"
-            git checkout -B "$BRANCH" "origin/$BRANCH"
             git reset --hard "origin/$BRANCH"
+            git checkout -B "$BRANCH" || true
 
             echo "📁 Garantindo diretório de dados persistentes..."
             mkdir -p data
