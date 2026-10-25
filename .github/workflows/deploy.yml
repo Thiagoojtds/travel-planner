@@ -49,9 +49,11 @@ jobs:
             echo "📁 Garantindo diretório de dados persistentes..."
             mkdir -p data
 
-            echo "🐳 Reconstruindo e reiniciando containers Docker..."
-            docker compose down || true
-            docker compose up -d --build
+            echo "🛑 Parando containers antigos e removendo órfãos (ex: caddy-proxy)..."
+            docker compose down --remove-orphans || true
+
+            echo "🐳 Subindo nova versão do TransFrete Pro..."
+            docker compose up -d --build --remove-orphans
 
             echo "🧹 Limpando imagens docker antigas..."
             docker image prune -f
