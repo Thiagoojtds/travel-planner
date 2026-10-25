@@ -1,10 +1,11 @@
 import { Router, Request, Response } from 'express';
 import { getStoredPin, setStoredPin, DEMO_PIN } from '../middleware/auth';
+import { authRateLimiter, recordFailedAttempt, resetAttempts } from '../middleware/rateLimiter';
 
 const router = Router();
 
-// POST /api/auth/verify
-router.post('/verify', async (req: Request, res: Response) => {
+// POST /api/auth/verify (Protegido por Rate Limiting contra força bruta)
+router.post('/verify', authRateLimiter, async (req: Request, res: Response) => {
   const { pin } = req.body;
   if (!pin) {
     return res.status(400).json({ error: 'PIN não informado' });
@@ -12,6 +13,7 @@ router.post('/verify', async (req: Request, res: Response) => {
 
   // 1. PIN de Teste / Demonstração (Portfólio)
   if (pin === DEMO_PIN) {
+    resetAttempts(req);
     return res.json({
       success: true,
       mode: 'demo',
@@ -19,9 +21,10 @@ router.post('/verify', async (req: Request, res: Response) => {
     });
   }
 
-  // 2. PIN Real de Produção (ex: 2703)
+  // 2. PIN Real de Produção
   const storedPin = await getStoredPin();
   if (pin === storedPin) {
+    resetAttempts(req);
     return res.json({
       success: true,
       mode: 'production',
@@ -29,7 +32,19 @@ router.post('/verify', async (req: Request, res: Response) => {
     });
   }
 
-  return res.status(401).json({ success: false, error: 'PIN incorreto' });
+  // Registra falha de tentativa para o IP
+  const failureInfo = recordFailedAttempt(req);
+  if (failureInfo.blocked) {
+    return res.status(429).json({
+      success: false,
+      error: `Limite de 5 tentativas atingido. Acesso bloqueado por ${failureInfo.remainingMinutes} minutos.`,
+    });
+  }
+
+  return res.status(401).json({
+    success: false,
+    error: `PIN incorreto. Você tem mais ${failureInfo.remainingAttempts} tentativa(s) antes do bloqueio temporário.`,
+  });
 });
 
 // POST /api/auth/change-pin
@@ -62,7 +77,7 @@ router.post('/change-pin', async (req: Request, res: Response) => {
 router.get('/status', async (_req: Request, res: Response) => {
   const storedPin = await getStoredPin();
   res.json({
-    isDefaultPin: storedPin === '2703' || storedPin === '1234',
+    isConfigured: Boolean(storedPin),
     demoPinAvailable: true,
   });
 });

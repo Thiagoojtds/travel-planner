@@ -143,7 +143,7 @@ Crie um arquivo `.env` na raiz do projeto (use o `.env.example` como referência
 PORT=8080
 DATABASE_URL="file:../data/app.db"
 SECRET_KEY=transfrete_jwt_secret_dev
-DEFAULT_ADMIN_PIN=2703
+DEFAULT_ADMIN_PIN=seu_pin_secreto_aqui
 ```
 
 ### 4. Inicializar o Banco de Dados
