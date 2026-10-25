@@ -12,8 +12,9 @@ router.post('/verify', authRateLimiter, async (req: Request, res: Response) => {
   }
 
   // 1. PIN de Teste / Demonstração (Portfólio)
+  // NOTA: Digitar 1234 NÃO zera o contador de tentativas erradas do PIN real
+  // para impedir que um atacante use o 1234 para resetar o limite de tentativas.
   if (pin === DEMO_PIN) {
-    resetAttempts(req);
     return res.json({
       success: true,
       mode: 'demo',
@@ -24,6 +25,7 @@ router.post('/verify', authRateLimiter, async (req: Request, res: Response) => {
   // 2. PIN Real de Produção
   const storedPin = await getStoredPin();
   if (pin === storedPin) {
+    // Apenas acertar o PIN real e legítimo de produção zera o contador de tentativas do IP
     resetAttempts(req);
     return res.json({
       success: true,
