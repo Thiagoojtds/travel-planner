@@ -12,7 +12,23 @@ services:
       - API_PORT=8080
       - HOST=0.0.0.0
       - NODE_ENV=production
-    ports:
-      - "${PORT_BIND:-80}:8080"
     volumes:
       - ./data:/app/data
+
+  caddy:
+    image: caddy:alpine
+    container_name: caddy-proxy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+      - caddy_data:/data
+      - caddy_config:/config
+    depends_on:
+      - app
+
+volumes:
+  caddy_data:
+  caddy_config:
