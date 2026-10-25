@@ -24,30 +24,20 @@ export async function setStoredPin(newPin: string): Promise<void> {
 }
 
 export async function pinAuthMiddleware(req: Request, res: Response, next: NextFunction) {
-  // Ignora requisições que não sejam para a API (assets, páginas HTML, favicon, etc.)
-  if (!req.path.startsWith('/api')) {
-    return next();
-  }
-
-  const providedPin = req.headers['x-access-pin'] as string;
+  const providedPin = (req.headers['x-access-pin'] as string | undefined)?.trim();
   const isDemo = providedPin === DEMO_PIN;
-
-  // Endpoints públicos de autenticação e status
-  if (req.path === '/api/auth/verify' || req.path === '/api/auth/status' || req.path === '/api/health') {
-    return asyncLocalStorage.run({ isDemo }, () => next());
-  }
 
   if (!providedPin) {
     return res.status(401).json({ error: 'PIN de acesso não fornecido.' });
   }
 
-  // Acesso permitido via PIN de Teste (1234) - Executa sob contexto demo.db
+  // 1. Acesso com PIN 1234 -> Executa OBRIGATORIAMENTE isolado no banco demo.db (Dados Fictícios)
   if (isDemo) {
     (req as any).isDemo = true;
     return asyncLocalStorage.run({ isDemo: true }, () => next());
   }
 
-  // Acesso permitido via PIN Real (ex: 2703) - Executa sob contexto app.db
+  // 2. Acesso com PIN Real -> Executa no banco real de produção app.db
   const currentPin = await getStoredPin();
   if (providedPin === currentPin) {
     (req as any).isDemo = false;
