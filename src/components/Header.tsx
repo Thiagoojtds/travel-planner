@@ -1,6 +1,7 @@
 import React from 'react';
 import { useApp } from '../context/AppContext';
-import { PlusCircle, Fuel, ChevronLeft, ChevronRight, Calendar, RotateCcw, ArrowUpDown, Menu } from 'lucide-react';
+import { useFinance } from '../context/FinanceContext';
+import { PlusCircle, Fuel, ChevronLeft, ChevronRight, Calendar, RotateCcw, ArrowUpDown, Menu, Loader2 } from 'lucide-react';
 
 interface HeaderProps {
   title: string;
@@ -18,6 +19,7 @@ export const Header: React.FC<HeaderProps> = ({
   onNewTransaction 
 }) => {
   const { selectedMonth, setSelectedMonth, setIsMobileMenuOpen } = useApp();
+  const { isLoading } = useFinance();
 
   const currentYearMonth = new Date().toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' }).slice(0, 7);
   const isCurrentMonth = selectedMonth === currentYearMonth;
@@ -61,7 +63,11 @@ export const Header: React.FC<HeaderProps> = ({
           <ChevronLeft className="w-4 h-4" />
         </button>
         <div className="flex items-center gap-1.5 px-2 text-xs font-semibold text-slate-200 capitalize min-w-[110px] sm:min-w-[130px] justify-center">
-          <Calendar className="w-3.5 h-3.5 text-sky-400" />
+          {isLoading ? (
+            <Loader2 className="w-3.5 h-3.5 text-sky-400 animate-spin" />
+          ) : (
+            <Calendar className="w-3.5 h-3.5 text-sky-400" />
+          )}
           <span className="truncate">{formattedMonth}</span>
         </div>
         <button
@@ -91,7 +97,10 @@ export const Header: React.FC<HeaderProps> = ({
   );
 
   return (
-    <header className="px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30">
+    <header className="px-3.5 sm:px-6 py-2.5 sm:py-3.5 border-b border-slate-800/80 bg-slate-900/80 backdrop-blur-md sticky top-0 z-30 relative overflow-hidden">
+      {isLoading && (
+        <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-gradient-to-r from-sky-500/20 via-sky-400 to-sky-500/20 animate-pulse" />
+      )}
       {/* Visual Mobile (Layout Compacto em 2 Linhas) */}
       <div className="flex flex-col gap-2.5 md:hidden">
         <div className="flex items-center justify-between gap-2">

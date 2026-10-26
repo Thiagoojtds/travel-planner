@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { TruckInfo, Fueling, MaintenanceRecord, ChecklistRecord, OilProgress, DefaultFuelingConfig } from '../types';
 import { api } from '../services/api';
 import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 
 interface TruckContextType {
   truck: TruckInfo | null;
@@ -40,10 +41,12 @@ export const TruckProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     state: 'PR',
     notes: 'Abastecimento Padrão'
   });
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const { showToast, triggerRefresh, refreshTrigger } = useApp();
+  const { isAuthenticated } = useAuth();
 
   const loadTruckData = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       setIsLoading(true);
       const [truckData, fuelingsData, maintenancesData, checklistsData, configData] = await Promise.all([
@@ -65,11 +68,13 @@ export const TruckProvider: React.FC<{ children: ReactNode }> = ({ children }) =
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    loadTruckData();
-  }, [loadTruckData, refreshTrigger]);
+    if (isAuthenticated) {
+      loadTruckData();
+    }
+  }, [loadTruckData, refreshTrigger, isAuthenticated]);
 
   const updateTruck = async (data: Partial<TruckInfo>) => {
     try {

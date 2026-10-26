@@ -5,9 +5,10 @@ import { FuelingModal } from '../modals/FuelingModal';
 import { DefaultFuelingModal } from '../modals/DefaultFuelingModal';
 import { QuickFuelingModal } from '../modals/QuickFuelingModal';
 import { Fuel, PlusCircle, Trash2, Edit2, CheckCircle2, Clock, Settings, Zap } from 'lucide-react';
+import { KpiCardSkeleton, TableRowsSkeleton } from '../common/LoadingSkeleton';
 
 export const DieselTab: React.FC = () => {
-  const { fuelings, deleteFueling, updateFueling, defaultFuelingConfig } = useTruck();
+  const { fuelings, deleteFueling, updateFueling, defaultFuelingConfig, isLoading } = useTruck();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isConfigModalOpen, setIsConfigModalOpen] = useState(false);
   const [isQuickModalOpen, setIsQuickModalOpen] = useState(false);
@@ -33,8 +34,24 @@ export const DieselTab: React.FC = () => {
     await updateFueling(fuel.id, { status: nextStatus });
   };
 
+  if (isLoading && fuelings.length === 0) {
+    return (
+      <div className="space-y-5 animate-pulse">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+        </div>
+        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-lg space-y-4">
+          <TableRowsSkeleton rows={5} cols={5} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 transition-opacity duration-300 ${isLoading ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
       {/* Cards de Resumo */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-lg">

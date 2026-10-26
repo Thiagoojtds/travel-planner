@@ -3,11 +3,13 @@ import { useFinance } from '../../context/FinanceContext';
 import { useApp } from '../../context/AppContext';
 import { UnifiedFinancialModal, FinancialModalType } from '../modals/UnifiedFinancialModal';
 import { UnifiedFinancialList } from '../finance/UnifiedFinancialList';
+import { KpiCardSkeleton, TableRowsSkeleton } from '../common/LoadingSkeleton';
 
 export const ExpensesTab: React.FC = () => {
   const { 
     expenses, 
-    dashboard
+    dashboard,
+    isLoading
   } = useFinance();
 
   const { selectedMonth } = useApp();
@@ -39,8 +41,24 @@ export const ExpensesTab: React.FC = () => {
     setIsModalOpen(true);
   };
 
+  if (isLoading && !dashboard) {
+    return (
+      <div className="space-y-5 animate-pulse">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+          <KpiCardSkeleton />
+        </div>
+        <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-lg space-y-4">
+          <TableRowsSkeleton rows={6} cols={5} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 transition-opacity duration-300 ${isLoading ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
       {/* Resumo Financeiro, Parcelas & Despesas Fixas */}
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <div className="p-4 rounded-2xl bg-slate-900/70 border border-slate-800 shadow-lg">

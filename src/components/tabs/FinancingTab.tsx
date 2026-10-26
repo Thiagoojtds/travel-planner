@@ -4,6 +4,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { useApp } from '../../context/AppContext';
 import { UnifiedFinancialModal } from '../modals/UnifiedFinancialModal';
 import { DebtModal } from '../modals/DebtModal';
+import { KpiCardSkeleton, TableRowsSkeleton } from '../common/LoadingSkeleton';
 import { 
   Landmark, 
   PlusCircle, 
@@ -22,7 +23,8 @@ export const FinancingTab: React.FC = () => {
     unpayDebtInstallment,
     deleteDebt,
     expenses, 
-    dashboard 
+    dashboard,
+    isLoading
   } = useFinance();
 
   const { selectedMonth } = useApp();
@@ -58,8 +60,26 @@ export const FinancingTab: React.FC = () => {
   // Histórico de quitados
   const settledDebts = debts.filter(d => d.status === 'quitado' || d.remainingBalance === 0);
 
+  if (isLoading && debts.length === 0) {
+    return (
+      <div className="space-y-6 animate-pulse">
+        <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+          </div>
+          <div className="mt-6">
+            <TableRowsSkeleton rows={4} cols={4} />
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-300 ${isLoading ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
       {/* Card Principal: Balanceamento de Dívidas & Parcelamentos */}
       <div className="p-6 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl backdrop-blur-sm">
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6 pb-4 border-b border-slate-800">

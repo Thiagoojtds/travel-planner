@@ -3,6 +3,7 @@ import { useFinance } from '../../context/FinanceContext';
 import { useTruck } from '../../context/TruckContext';
 import { useApp } from '../../context/AppContext';
 import { FinancialEvolutionChart } from '../charts/FinancialEvolutionChart';
+import { DashboardSkeleton } from '../common/LoadingSkeleton';
 import { 
   TrendingUp, 
   CircleDollarSign, 
@@ -14,7 +15,8 @@ import {
   Check,
   ArrowUpRight,
   ArrowDownRight,
-  Minus
+  Minus,
+  Loader2
 } from 'lucide-react';
 
 interface DashboardTabProps {
@@ -23,7 +25,7 @@ interface DashboardTabProps {
 }
 
 export const DashboardTab: React.FC<DashboardTabProps> = () => {
-  const { dashboard, debts, fixedExpenses, expenses, payDebtInstallment, payFixedExpense, updateExpense } = useFinance();
+  const { dashboard, debts, fixedExpenses, expenses, payDebtInstallment, payFixedExpense, updateExpense, isLoading } = useFinance();
   const { oilProgress } = useTruck();
   const { setActiveTab, selectedMonth } = useApp();
 
@@ -110,8 +112,18 @@ export const DashboardTab: React.FC<DashboardTabProps> = () => {
     }
   };
 
+  if (isLoading && !dashboard) {
+    return <DashboardSkeleton />;
+  }
+
   return (
-    <div className="space-y-6">
+    <div className={`space-y-6 transition-opacity duration-300 ${isLoading ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
+      {isLoading && (
+        <div className="flex items-center gap-2 px-3 py-1.5 rounded-xl bg-sky-500/10 border border-sky-500/20 text-sky-400 text-xs w-fit">
+          <Loader2 className="w-3.5 h-3.5 animate-spin" />
+          <span>Atualizando dados do mês ({selectedMonth})...</span>
+        </div>
+      )}
       {/* Alerta Preventivo de Óleo se Crítico ou Alerta */}
       {oilProgress.isWarning && (
         <div className="p-4 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-between">

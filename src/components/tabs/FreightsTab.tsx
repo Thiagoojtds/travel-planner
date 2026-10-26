@@ -3,6 +3,7 @@ import { useFreights } from '../../context/FreightContext';
 import { useApp } from '../../context/AppContext';
 import { Freight } from '../../types';
 import { FreightModal } from '../modals/FreightModal';
+import { KpiCardSkeleton, TableRowsSkeleton } from '../common/LoadingSkeleton';
 import { 
   Truck, 
   PlusCircle, 
@@ -42,7 +43,7 @@ interface WeekGroup {
 }
 
 export const FreightsTab: React.FC = () => {
-  const { freights, deleteFreight, updateFreight } = useFreights();
+  const { freights, deleteFreight, updateFreight, isLoading } = useFreights();
   const { selectedMonth, setSelectedMonth } = useApp();
 
   const activeMonth = selectedMonth || new Date().toISOString().slice(0, 7);
@@ -471,8 +472,26 @@ export const FreightsTab: React.FC = () => {
     );
   };
 
+  if (isLoading && freights.length === 0) {
+    return (
+      <div className="space-y-5 animate-pulse">
+        <div className="p-5 rounded-2xl bg-slate-900/90 border border-slate-800 shadow-xl space-y-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+            <KpiCardSkeleton />
+          </div>
+        </div>
+        <div className="p-5 rounded-2xl bg-slate-900/80 border border-slate-800 shadow-xl space-y-4">
+          <TableRowsSkeleton rows={5} cols={5} />
+        </div>
+      </div>
+    );
+  }
+
   return (
-    <div className="space-y-5">
+    <div className={`space-y-5 transition-opacity duration-300 ${isLoading ? 'opacity-70 pointer-events-none' : 'opacity-100'}`}>
       {/* 1. Barra de Navegação do Mês & Meta de 3 Viagens/Semana */}
       <div className="p-4 sm:p-5 rounded-2xl bg-gradient-to-b from-slate-900/90 to-slate-950/90 border border-slate-800 shadow-xl space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">

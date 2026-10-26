@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { Debt, FixedExpense, Expense, DashboardData, CreditCardInvoice } from '../types';
 import { api } from '../services/api';
 import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 
 interface FinanceContextType {
   debts: Debt[];
@@ -38,10 +39,12 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [invoices, setInvoices] = useState<CreditCardInvoice[]>([]);
   const [dashboard, setDashboard] = useState<DashboardData | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const { showToast, triggerRefresh, refreshTrigger, selectedMonth } = useApp();
+  const { isAuthenticated } = useAuth();
 
   const loadFinanceData = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       setIsLoading(true);
       const [debtsData, fixedData, expensesData, dashboardData, invoicesData] = await Promise.all([
@@ -61,11 +64,13 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     } finally {
       setIsLoading(false);
     }
-  }, [selectedMonth]);
+  }, [selectedMonth, isAuthenticated]);
 
   useEffect(() => {
-    loadFinanceData();
-  }, [loadFinanceData, refreshTrigger]);
+    if (isAuthenticated) {
+      loadFinanceData();
+    }
+  }, [loadFinanceData, refreshTrigger, isAuthenticated]);
 
   const addDebt = async (data: Partial<Debt>): Promise<Debt> => {
     try {

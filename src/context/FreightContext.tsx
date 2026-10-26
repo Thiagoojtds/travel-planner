@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, Rea
 import { Freight } from '../types';
 import { api } from '../services/api';
 import { useApp } from './AppContext';
+import { useAuth } from './AuthContext';
 
 interface FreightContextType {
   freights: Freight[];
@@ -16,10 +17,12 @@ const FreightContext = createContext<FreightContextType | undefined>(undefined);
 
 export const FreightProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [freights, setFreights] = useState<Freight[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(false);
+  const [isLoading, setIsLoading] = useState<boolean>(true);
   const { showToast, triggerRefresh, refreshTrigger } = useApp();
+  const { isAuthenticated } = useAuth();
 
   const loadFreights = useCallback(async () => {
+    if (!isAuthenticated) return;
     try {
       setIsLoading(true);
       const data = await api.get<Freight[]>('/freights');
@@ -29,11 +32,13 @@ export const FreightProvider: React.FC<{ children: ReactNode }> = ({ children })
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [isAuthenticated]);
 
   useEffect(() => {
-    loadFreights();
-  }, [loadFreights, refreshTrigger]);
+    if (isAuthenticated) {
+      loadFreights();
+    }
+  }, [loadFreights, refreshTrigger, isAuthenticated]);
 
   const addFreight = async (data: Partial<Freight>): Promise<Freight> => {
     try {
