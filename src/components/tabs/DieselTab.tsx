@@ -156,14 +156,6 @@ export const DieselTab: React.FC = () => {
 
         <div className="flex items-center gap-2">
           <button
-            onClick={() => setIsQuickModalOpen(true)}
-            className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-slate-800 hover:bg-slate-700 text-amber-400 hover:text-amber-300 border border-slate-700 text-xs font-bold transition-all"
-          >
-            <Zap className="w-3.5 h-3.5 fill-amber-400" />
-            <span>Lançar Padrão</span>
-          </button>
-
-          <button
             onClick={() => {
               setFuelingToEdit(null);
               setIsModalOpen(true);
@@ -171,7 +163,7 @@ export const DieselTab: React.FC = () => {
             className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 text-xs font-bold transition-all shadow-md shadow-amber-500/20"
           >
             <PlusCircle className="w-4 h-4" />
-            <span>Novo Manual</span>
+            <span>Novo Abastecimento</span>
           </button>
         </div>
       </div>
@@ -241,7 +233,11 @@ export const DieselTab: React.FC = () => {
                   <div className="text-[11px] text-slate-500 flex items-center gap-3">
                     <span>Data: {fuel.date}</span>
                     <span>•</span>
-                    <span className="font-mono">Odômetro: {fuel.currentKm.toLocaleString('pt-BR')} km</span>
+                    {fuel.currentKm && fuel.currentKm > 0 ? (
+                      <span className="font-mono">Odômetro: {fuel.currentKm.toLocaleString('pt-BR')} km</span>
+                    ) : (
+                      <span className="text-slate-500">Odômetro não informado</span>
+                    )}
                     {fuel.notes && (
                       <>
                         <span>•</span>

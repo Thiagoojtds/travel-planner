@@ -11,14 +11,14 @@ interface FuelingModalProps {
 }
 
 export const FuelingModal: React.FC<FuelingModalProps> = ({ isOpen, onClose, fuelingToEdit }) => {
-  const { addFueling, updateFueling, truck } = useTruck();
+  const { addFueling, updateFueling, truck, defaultFuelingConfig } = useTruck();
   const { freights } = useFreights();
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [currentKm, setCurrentKm] = useState<number | string>(truck?.currentKm || '');
+  const [currentKm, setCurrentKm] = useState<number | string>('');
   const [liters, setLiters] = useState<number | string>(300);
   const [pricePerLiter, setPricePerLiter] = useState<number | string>(5.99);
-  const [tank, setTank] = useState<FuelTankType>('ambos');
+  const [tank, setTank] = useState<FuelTankType>('principal_600');
   const [status, setStatus] = useState<'pago' | 'pendente'>('pago');
   const [city, setCity] = useState('');
   const [state, setState] = useState('');
@@ -30,10 +30,10 @@ export const FuelingModal: React.FC<FuelingModalProps> = ({ isOpen, onClose, fue
 
     if (fuelingToEdit) {
       setDate(fuelingToEdit.date);
-      setCurrentKm(fuelingToEdit.currentKm);
+      setCurrentKm(fuelingToEdit.currentKm || '');
       setLiters(fuelingToEdit.liters);
       setPricePerLiter(fuelingToEdit.pricePerLiter);
-      setTank(fuelingToEdit.tank);
+      setTank(fuelingToEdit.tank || 'principal_600');
       setStatus(fuelingToEdit.status || 'pago');
       setCity(fuelingToEdit.city || '');
       setState(fuelingToEdit.state || '');
@@ -41,17 +41,17 @@ export const FuelingModal: React.FC<FuelingModalProps> = ({ isOpen, onClose, fue
       setNotes(fuelingToEdit.notes || '');
     } else {
       setDate(new Date().toISOString().split('T')[0]);
-      setCurrentKm(truck?.currentKm || '');
-      setLiters(300);
-      setPricePerLiter(5.99);
-      setTank('ambos');
-      setStatus('pago');
-      setCity('');
-      setState('');
+      setCurrentKm('');
+      setLiters(defaultFuelingConfig?.liters || 300);
+      setPricePerLiter(defaultFuelingConfig?.pricePerLiter || 5.99);
+      setTank('principal_600');
+      setStatus(defaultFuelingConfig?.status || 'pago');
+      setCity(defaultFuelingConfig?.city || '');
+      setState(defaultFuelingConfig?.state || '');
       setFreightId('');
-      setNotes('');
+      setNotes(defaultFuelingConfig?.notes || '');
     }
-  }, [isOpen, fuelingToEdit, truck?.currentKm]);
+  }, [isOpen, fuelingToEdit, defaultFuelingConfig]);
 
   if (!isOpen) return null;
 
@@ -63,7 +63,7 @@ export const FuelingModal: React.FC<FuelingModalProps> = ({ isOpen, onClose, fue
     e.preventDefault();
     const payload = {
       date,
-      currentKm: Number(currentKm) || 0,
+      currentKm: currentKm !== '' && !isNaN(Number(currentKm)) ? Number(currentKm) : 0,
       liters: numLiters,
       pricePerLiter: numPrice,
       totalAmount,
@@ -112,7 +112,7 @@ export const FuelingModal: React.FC<FuelingModalProps> = ({ isOpen, onClose, fue
             <label className="block text-xs font-medium text-slate-300 mb-1.5">Tanque Abastecido</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'principal_600', label: 'Principal (600L)', desc: 'Tanque Primário' },
+                { id: 'principal_600', label: 'Principal (600L)', desc: 'Tanque Primário (Padrão)' },
                 { id: 'auxiliar_300', label: 'Auxiliar (300L)', desc: 'Tanque Suplementar' },
                 { id: 'ambos', label: 'Ambos (900L)', desc: 'Abastecimento Completo' },
               ].map(t => (
@@ -146,14 +146,16 @@ export const FuelingModal: React.FC<FuelingModalProps> = ({ isOpen, onClose, fue
               />
             </div>
             <div>
-              <label className="block text-xs font-medium text-slate-300 mb-1">Odômetro Atual (KM)</label>
+              <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+                <span>Odômetro Atual (KM)</span>
+                <span className="text-[10px] text-slate-500 font-normal">Opcional</span>
+              </label>
               <div className="relative">
                 <input
                   type="number"
-                  required
                   value={currentKm}
                   onChange={e => setCurrentKm(e.target.value)}
-                  placeholder="Ex: 145000"
+                  placeholder={truck?.currentKm ? `Opcional (Atual: ${truck.currentKm.toLocaleString('pt-BR')} km)` : "Opcional (Ex: 145000)"}
                   className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-amber-500"
                 />
                 <Gauge className="w-3.5 h-3.5 text-slate-500 absolute right-3 top-2.5" />

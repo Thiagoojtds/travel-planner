@@ -18,7 +18,7 @@ export const QuickFuelingModal: React.FC<QuickFuelingModalProps> = ({
   const { freights } = useFreights();
 
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [currentKm, setCurrentKm] = useState<number | string>(truck?.currentKm || '');
+  const [currentKm, setCurrentKm] = useState<number | string>('');
   const [freightId, setFreightId] = useState('');
   const [status, setStatus] = useState<'pago' | 'pendente'>('pago');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -26,18 +26,18 @@ export const QuickFuelingModal: React.FC<QuickFuelingModalProps> = ({
   useEffect(() => {
     if (isOpen) {
       setDate(new Date().toISOString().split('T')[0]);
-      setCurrentKm(truck?.currentKm || '');
+      setCurrentKm('');
       setFreightId('');
       setStatus(defaultFuelingConfig?.status || 'pago');
     }
-  }, [isOpen, truck?.currentKm, defaultFuelingConfig]);
+  }, [isOpen, defaultFuelingConfig]);
 
   if (!isOpen) return null;
 
   const liters = defaultFuelingConfig?.liters || 300;
   const pricePerLiter = defaultFuelingConfig?.pricePerLiter || 5.89;
   const totalAmount = liters * pricePerLiter;
-  const tank = defaultFuelingConfig?.tank || 'ambos';
+  const tank = defaultFuelingConfig?.tank || 'principal_600';
   const tankLabel =
     tank === 'principal_600'
       ? 'Tanque Principal (600L)'
@@ -51,7 +51,7 @@ export const QuickFuelingModal: React.FC<QuickFuelingModalProps> = ({
       setIsSubmitting(true);
       await createDefaultFueling({
         date,
-        currentKm: Number(currentKm) || truck?.currentKm || 0,
+        currentKm: currentKm !== '' && !isNaN(Number(currentKm)) ? Number(currentKm) : 0,
         freightId: freightId || undefined,
         status,
       });
@@ -144,19 +144,22 @@ export const QuickFuelingModal: React.FC<QuickFuelingModalProps> = ({
 
           {/* Odômetro */}
           <div>
-            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
-              <Gauge className="w-3.5 h-3.5 text-slate-400" />
-              Odômetro do Caminhão (KM)
+            <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+              <span className="flex items-center gap-1.5">
+                <Gauge className="w-3.5 h-3.5 text-slate-400" />
+                Odômetro do Caminhão (KM)
+              </span>
+              <span className="text-[10px] text-slate-500 font-normal">Opcional</span>
             </label>
             <input
               type="number"
               value={currentKm}
               onChange={e => setCurrentKm(e.target.value)}
-              placeholder={`KM atual: ${truck?.currentKm || 0}`}
+              placeholder={truck?.currentKm ? `Opcional (Atual: ${truck.currentKm.toLocaleString('pt-BR')} km)` : "Opcional (Ex: 145000)"}
               className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-amber-500 font-mono"
             />
             <span className="text-[10px] text-slate-500 mt-0.5 block">
-              KM atual registrado no Iveco: {truck?.currentKm?.toLocaleString('pt-BR') || 0} km
+              KM atual registrado: {truck?.currentKm?.toLocaleString('pt-BR') || 0} km (deixe em branco se não quiser alterar)
             </span>
           </div>
 

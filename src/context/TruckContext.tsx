@@ -35,7 +35,7 @@ export const TruckProvider: React.FC<{ children: ReactNode }> = ({ children }) =
   const [defaultFuelingConfig, setDefaultFuelingConfig] = useState<DefaultFuelingConfig>({
     liters: 300,
     pricePerLiter: 5.89,
-    tank: 'ambos',
+    tank: 'principal_600',
     status: 'pago',
     city: 'Curitiba',
     state: 'PR',
@@ -61,7 +61,10 @@ export const TruckProvider: React.FC<{ children: ReactNode }> = ({ children }) =
       setMaintenances(maintenancesData);
       setChecklists(checklistsData);
       if (configData) {
-        setDefaultFuelingConfig(configData);
+        setDefaultFuelingConfig({
+          ...configData,
+          tank: configData.tank && configData.tank !== 'ambos' ? configData.tank : 'principal_600',
+        });
       }
     } catch (err: any) {
       console.error('Erro ao carregar dados do caminhão:', err);

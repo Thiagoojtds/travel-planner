@@ -13,7 +13,7 @@ export const DefaultFuelingModal: React.FC<DefaultFuelingModalProps> = ({ isOpen
 
   const [liters, setLiters] = useState<number | string>(300);
   const [pricePerLiter, setPricePerLiter] = useState<number | string>(5.89);
-  const [tank, setTank] = useState<FuelTankType>('ambos');
+  const [tank, setTank] = useState<FuelTankType>('principal_600');
   const [status, setStatus] = useState<'pago' | 'pendente'>('pago');
   const [city, setCity] = useState('Curitiba');
   const [state, setState] = useState('PR');
@@ -24,7 +24,7 @@ export const DefaultFuelingModal: React.FC<DefaultFuelingModalProps> = ({ isOpen
     if (isOpen && defaultFuelingConfig) {
       setLiters(defaultFuelingConfig.liters);
       setPricePerLiter(defaultFuelingConfig.pricePerLiter);
-      setTank(defaultFuelingConfig.tank);
+      setTank(defaultFuelingConfig.tank && defaultFuelingConfig.tank !== 'ambos' ? defaultFuelingConfig.tank : 'principal_600');
       setStatus(defaultFuelingConfig.status);
       setCity(defaultFuelingConfig.city || 'Curitiba');
       setState(defaultFuelingConfig.state || 'PR');
@@ -86,7 +86,7 @@ export const DefaultFuelingModal: React.FC<DefaultFuelingModalProps> = ({ isOpen
             <label className="block text-xs font-medium text-slate-300 mb-1.5">Tanque Padrão</label>
             <div className="grid grid-cols-3 gap-2">
               {[
-                { id: 'principal_600', label: 'Principal (600L)', desc: 'Tanque 1' },
+                { id: 'principal_600', label: 'Principal (600L)', desc: 'Tanque 1 (Padrão)' },
                 { id: 'auxiliar_300', label: 'Auxiliar (300L)', desc: 'Tanque 2' },
                 { id: 'ambos', label: 'Ambos (900L)', desc: 'Completo' },
               ].map(t => (

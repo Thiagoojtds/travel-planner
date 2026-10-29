@@ -57,7 +57,7 @@ router.post('/', async (req: Request, res: Response) => {
         liters: lit,
         pricePerLiter: price,
         totalAmount: total,
-        tank: tank || 'ambos',
+        tank: tank || 'principal_600',
         status: fuelingStatus,
         city,
         state,
@@ -106,13 +106,17 @@ router.get('/default-config', async (_req: Request, res: Response) => {
     });
 
     if (config && config.value) {
-      return res.json(JSON.parse(config.value));
+      const parsed = JSON.parse(config.value);
+      return res.json({
+        ...parsed,
+        tank: parsed.tank && parsed.tank !== 'ambos' ? parsed.tank : 'principal_600',
+      });
     }
 
     const defaultConfig = {
       liters: 300,
       pricePerLiter: 5.89,
-      tank: 'ambos',
+      tank: 'principal_600',
       status: 'pago',
       city: 'Curitiba',
       state: 'PR',
@@ -133,7 +137,7 @@ router.put('/default-config', async (req: Request, res: Response) => {
     const configData = {
       liters: Number(liters) || 300,
       pricePerLiter: Number(pricePerLiter) || 5.89,
-      tank: tank || 'ambos',
+      tank: tank || 'principal_600',
       status: status === 'pendente' ? 'pendente' : 'pago',
       city: city || 'Curitiba',
       state: state || 'PR',
