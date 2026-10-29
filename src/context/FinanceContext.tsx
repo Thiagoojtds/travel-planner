@@ -51,9 +51,9 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
       const [debtsData, fixedData, expensesData, dashboardData, invoicesData] = await Promise.all([
         api.get<Debt[]>('/debts', { month: selectedMonth }),
         api.get<FixedExpense[]>('/fixed-expenses'),
-        api.get<Expense[]>('/expenses', { month: selectedMonth }),
+        api.get<Expense[]>('/expenses'),
         api.get<DashboardData>('/dashboard', { month: selectedMonth }),
-        api.get<CreditCardInvoice[]>('/invoices', { month: selectedMonth }).catch(() => [] as CreditCardInvoice[]),
+        api.get<CreditCardInvoice[]>('/invoices').catch(() => [] as CreditCardInvoice[]),
       ]);
       setDebts(debtsData);
       setFixedExpenses(fixedData);

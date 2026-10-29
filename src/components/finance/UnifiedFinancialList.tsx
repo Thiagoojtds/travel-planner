@@ -20,12 +20,40 @@ import {
   Receipt,
   CreditCard,
   Layers,
-  FileText
+  FileText,
+  List,
+  Kanban,
+  CalendarDays,
+  CalendarRange,
+  Filter
 } from 'lucide-react';
 import { FixedExpenseModal } from '../modals/FixedExpenseModal';
 import { DebtModal } from '../modals/DebtModal';
 import { ExpenseModal } from '../modals/ExpenseModal';
 import { CreditCardInvoiceDetailsModal } from '../modals/CreditCardInvoiceDetailsModal';
+import { ExpensesKanban } from './ExpensesKanban';
+
+export interface UnifiedFinancialItem {
+  id: string;
+  entityType: 'financiamento' | 'entrada' | 'despesa' | 'fixa' | 'fatura_cartao';
+  categoryBadge: string;
+  title: string;
+  subtitle: string;
+  amount: number;
+  totalOriginal?: number;
+  remainingBalance?: number;
+  installmentInfo?: string;
+  dateOrDueDay: string;
+  rawDate: string;
+  status: 'pendente' | 'pago' | 'quitado' | 'recebido';
+  statusLabel: string;
+  isPlanejada?: boolean;
+  isPaidInMonth?: boolean;
+  rawDebt?: Debt;
+  rawFixedExpense?: FixedExpense;
+  rawExpense?: Expense;
+  rawInvoice?: CreditCardInvoice;
+}
 
 export type EntityCategoryFilter = 'todos' | 'todas_despesas' | 'despesa' | 'fatura_cartao' | 'fixa' | 'financiamento' | 'entrada';
 export type EntityStatusFilter = 'todos' | 'pendentes' | 'pagos';
@@ -74,6 +102,157 @@ export const getDueDateStr = (monthYear: string, dueDay: number | string): strin
   return `${monthYear}-${String(Number(dueDay) || 10).padStart(2, '0')}`;
 };
 
+export type PeriodScope = 
+  | 'mes_atual' 
+  | 'hoje' 
+  | 'esta_semana' 
+  | 'proxima_semana' 
+  | 'proximos_15_dias' 
+  | 'proximos_30_dias' 
+  | 'personalizado' 
+  | 'todos';
+
+const formatYMD = (date: Date): string => {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+};
+
+export const getPeriodRange = (
+  scope: PeriodScope, 
+  selectedMonth: string, 
+  customStart?: string, 
+  customEnd?: string
+): { start?: string; end?: string; label: string } => {
+  const now = new Date();
+  const todayStr = formatYMD(now);
+
+  switch (scope) {
+    case 'hoje':
+      return { 
+        start: todayStr, 
+        end: todayStr, 
+        label: `Hoje (${formatDateDisplay(todayStr).fullDate})` 
+      };
+
+    case 'esta_semana': {
+      const dayOfWeek = now.getDay();
+      const diffToMonday = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
+      const monday = new Date(now);
+      monday.setDate(now.getDate() + diffToMonday);
+      const sunday = new Date(monday);
+      sunday.setDate(monday.getDate() + 6);
+
+      const start = formatYMD(monday);
+      const end = formatYMD(sunday);
+      return { 
+        start, 
+        end, 
+        label: `Esta Semana (${formatDateDisplay(start).fullDate} a ${formatDateDisplay(end).fullDate})` 
+      };
+    }
+
+    case 'proxima_semana': {
+      const nextWeekDate = new Date(now);
+      nextWeekDate.setDate(nextWeekDate.getDate() + 7);
+      const end = formatYMD(nextWeekDate);
+      return { 
+        start: todayStr, 
+        end, 
+        label: `Próxima Semana (${formatDateDisplay(todayStr).fullDate} a ${formatDateDisplay(end).fullDate})` 
+      };
+    }
+
+    case 'proximos_15_dias': {
+      const targetDate = new Date(now);
+      targetDate.setDate(targetDate.getDate() + 15);
+      const end = formatYMD(targetDate);
+      return { 
+        start: todayStr, 
+        end, 
+        label: `Próximos 15 dias (${formatDateDisplay(todayStr).fullDate} a ${formatDateDisplay(end).fullDate})` 
+      };
+    }
+
+    case 'proximos_30_dias': {
+      const targetDate = new Date(now);
+      targetDate.setDate(targetDate.getDate() + 30);
+      const end = formatYMD(targetDate);
+      return { 
+        start: todayStr, 
+        end, 
+        label: `Próximos 30 dias (${formatDateDisplay(todayStr).fullDate} a ${formatDateDisplay(end).fullDate})` 
+      };
+    }
+
+    case 'personalizado': {
+      const start = customStart || '';
+      const end = customEnd || '';
+      const startFmt = start ? formatDateDisplay(start).fullDate : 'Início';
+      const endFmt = end ? formatDateDisplay(end).fullDate : 'Fim';
+      return { 
+        start: start || undefined, 
+        end: end || undefined, 
+        label: `Personalizado (${startFmt} até ${endFmt})` 
+      };
+    }
+
+    case 'todos':
+      return { 
+        start: undefined, 
+        end: undefined, 
+        label: 'Histórico Completo' 
+      };
+
+    case 'mes_atual':
+    default: {
+      const [y, m] = (selectedMonth || todayStr.slice(0, 7)).split('-').map(Number);
+      const lastDay = new Date(y, m, 0).getDate();
+      const monthPrefix = `${y}-${String(m).padStart(2, '0')}`;
+      const start = `${monthPrefix}-01`;
+      const end = `${monthPrefix}-${String(lastDay).padStart(2, '0')}`;
+      return { 
+        start, 
+        end, 
+        label: `Mês Selecionado (${selectedMonth})` 
+      };
+    }
+  }
+};
+
+const getMonthsInRange = (startStr?: string, endStr?: string, fallbackMonth?: string): string[] => {
+  if (!startStr && !endStr) return [fallbackMonth || formatYMD(new Date()).slice(0, 7)];
+  const s = startStr || `${fallbackMonth || formatYMD(new Date()).slice(0, 7)}-01`;
+  const e = endStr || s;
+  const startY = parseInt(s.slice(0, 4), 10) || 2026;
+  const startM = parseInt(s.slice(5, 7), 10) || 1;
+  const endY = parseInt(e.slice(0, 4), 10) || startY;
+  const endM = parseInt(e.slice(5, 7), 10) || startM;
+
+  const months: string[] = [];
+  let currY = startY;
+  let currM = startM;
+  let guard = 0;
+  while ((currY < endY || (currY === endY && currM <= endM)) && guard < 60) {
+    months.push(`${currY}-${String(currM).padStart(2, '0')}`);
+    currM++;
+    if (currM > 12) {
+      currM = 1;
+      currY++;
+    }
+    guard++;
+  }
+  return months.length > 0 ? months : [fallbackMonth || formatYMD(new Date()).slice(0, 7)];
+};
+
+const isDateInRange = (dateStr: string, start?: string, end?: string): boolean => {
+  if (!dateStr) return false;
+  if (start && dateStr < start) return false;
+  if (end && dateStr > end) return false;
+  return true;
+};
+
 export const UnifiedFinancialList: React.FC<{
   initialCategoryFilter?: EntityCategoryFilter;
   title?: string;
@@ -106,13 +285,20 @@ export const UnifiedFinancialList: React.FC<{
   const [categoryFilter, setCategoryFilter] = useState<EntityCategoryFilter>(initialCategoryFilter);
   const [statusFilter, setStatusFilter] = useState<EntityStatusFilter>('todos');
   const [searchTerm, setSearchTerm] = useState('');
-  const [monthScope, setMonthScope] = useState<'mes_atual' | 'todos'>('mes_atual');
+  const [periodScope, setPeriodScope] = useState<PeriodScope>('mes_atual');
+  const [customStartDate, setCustomStartDate] = useState<string>('');
+  const [customEndDate, setCustomEndDate] = useState<string>('');
   const [editingFixedExpense, setEditingFixedExpense] = useState<FixedExpense | null>(null);
   const [editingDebt, setEditingDebt] = useState<Debt | null>(null);
   const [editingExpense, setEditingExpense] = useState<Expense | null>(null);
   const [inspectingInvoice, setInspectingInvoice] = useState<CreditCardInvoice | null>(null);
   const [sortField, setSortField] = useState<SortField>('date');
   const [sortOrder, setSortOrder] = useState<SortOrder>('desc');
+  const [viewMode, setViewMode] = useState<'lista' | 'kanban'>('lista');
+
+  const activePeriodRange = useMemo(() => {
+    return getPeriodRange(periodScope, selectedMonth, customStartDate, customEndDate);
+  }, [periodScope, selectedMonth, customStartDate, customEndDate]);
 
   const handleSort = (field: SortField) => {
     if (sortField === field) {
@@ -123,69 +309,186 @@ export const UnifiedFinancialList: React.FC<{
     }
   };
 
+  // Funções unificadas de ação para Lista e Kanban
+  const handlePayItem = async (item: UnifiedFinancialItem) => {
+    const isFinanciamento = item.entityType === 'financiamento';
+    const isFixa = item.entityType === 'fixa';
+    const isFaturaCartao = item.entityType === 'fatura_cartao';
+    const isDespesa = item.entityType === 'despesa';
+    const isEntrada = item.entityType === 'entrada';
+
+    if (isEntrada && item.rawExpense) {
+      await updateExpense(item.rawExpense.id, { status: 'recebido' });
+    } else if (isFaturaCartao) {
+      const invId = item.rawInvoice?.id || item.rawExpense?.creditCardInvoiceId;
+      if (invId) {
+        await payInvoice(invId);
+      } else if (item.rawExpense) {
+        await updateExpense(item.rawExpense.id, { status: 'pago' });
+      }
+    } else if (isFinanciamento && item.rawDebt) {
+      await payDebtInstallment(item.rawDebt.id, undefined, item.rawDate);
+    } else if (isFixa && item.rawFixedExpense) {
+      await payFixedExpense(item.rawFixedExpense.id, item.rawDate);
+    } else if (isDespesa && item.rawExpense) {
+      await updateExpense(item.rawExpense.id, { status: 'pago' });
+    }
+  };
+
+  const handleUnpayItem = async (item: UnifiedFinancialItem) => {
+    const isFinanciamento = item.entityType === 'financiamento';
+    const isFixa = item.entityType === 'fixa';
+    const isFaturaCartao = item.entityType === 'fatura_cartao';
+    const isDespesa = item.entityType === 'despesa';
+    const isEntrada = item.entityType === 'entrada';
+
+    if (isEntrada && item.rawExpense) {
+      await updateExpense(item.rawExpense.id, { status: 'pendente' });
+    } else if (isFaturaCartao) {
+      const invId = item.rawInvoice?.id || item.rawExpense?.creditCardInvoiceId;
+      if (invId) {
+        await unpayInvoice(invId);
+      } else if (item.rawExpense) {
+        await updateExpense(item.rawExpense.id, { status: 'pendente' });
+      }
+    } else if (isFinanciamento && item.rawDebt) {
+      await unpayDebtInstallment(item.rawDebt.id, selectedMonth);
+    } else if (isFixa && item.rawExpense) {
+      await deleteExpense(item.rawExpense.id);
+    } else if (isDespesa && item.rawExpense) {
+      await updateExpense(item.rawExpense.id, { status: 'pendente' });
+    }
+  };
+
+  const handleDeleteItem = async (item: UnifiedFinancialItem) => {
+    const isFinanciamento = item.entityType === 'financiamento';
+    const isFixa = item.entityType === 'fixa';
+    const isFaturaCartao = item.entityType === 'fatura_cartao';
+
+    if (isFinanciamento && item.rawDebt) {
+      if (item.isPaidInMonth && !item.rawDebt.status.includes('quitado')) {
+        if (window.confirm(`Estornar o pagamento da parcela de "${item.title}" referente a ${selectedMonth}?\n\nEla voltará a constar como pendente/a pagar neste mês e o saldo devedor será restaurado.`)) {
+          await unpayDebtInstallment(item.rawDebt.id, selectedMonth);
+        }
+      } else {
+        if (window.confirm(`Excluir contrato ${item.rawDebt.title}?`)) {
+          await deleteDebt(item.rawDebt.id);
+        }
+      }
+    } else if (isFixa && item.rawFixedExpense) {
+      if (item.isPaidInMonth && item.rawExpense) {
+        if (window.confirm(`Estornar o pagamento da despesa fixa "${item.title}" referente a ${selectedMonth}?`)) {
+          await deleteExpense(item.rawExpense.id);
+        }
+      } else {
+        if (window.confirm(`Excluir despesa fixa ${item.rawFixedExpense.description}?`)) {
+          await deleteFixedExpense(item.rawFixedExpense.id);
+        }
+      }
+    } else if (isFaturaCartao) {
+      const invId = item.rawInvoice?.id || item.rawExpense?.creditCardInvoiceId;
+      if (window.confirm(`Excluir a fatura "${item.title}" de ${selectedMonth} e suas compras associadas?`)) {
+        if (invId) {
+          await deleteInvoice(invId);
+        } else if (item.rawExpense) {
+          await deleteExpense(item.rawExpense.id);
+        }
+      }
+    } else if (item.rawExpense) {
+      if (window.confirm(`Excluir lançamento ${item.rawExpense.description}?`)) {
+        await deleteExpense(item.rawExpense.id);
+      }
+    }
+  };
+
+  const handleEditItem = (item: UnifiedFinancialItem) => {
+    if (item.entityType === 'financiamento' && item.rawDebt) {
+      setEditingDebt(item.rawDebt);
+    } else if (item.entityType === 'fixa' && item.rawFixedExpense) {
+      setEditingFixedExpense(item.rawFixedExpense);
+    } else if ((item.entityType === 'despesa' || item.entityType === 'entrada') && item.rawExpense) {
+      setEditingExpense(item.rawExpense);
+    }
+  };
+
+  const handleInspectInvoice = (item: UnifiedFinancialItem) => {
+    const inv = item.rawInvoice || item.rawExpense?.creditCardInvoice || {
+      id: item.rawExpense?.creditCardInvoiceId || item.id,
+      cardName: item.title.replace('Fatura: ', ''),
+      month: selectedMonth,
+      dueDate: item.rawDate,
+      status: item.status as any,
+      items: []
+    };
+    setInspectingInvoice(inv);
+  };
+
   // Consolidação de todas as entidades
   const allItems = useMemo(() => {
-    const list: Array<{
-      id: string;
-      entityType: 'financiamento' | 'entrada' | 'despesa' | 'fixa' | 'fatura_cartao';
-      categoryBadge: string;
-      title: string;
-      subtitle: string;
-      amount: number;
-      totalOriginal?: number;
-      remainingBalance?: number;
-      installmentInfo?: string;
-      dateOrDueDay: string;
-      rawDate: string;
-      status: 'pendente' | 'pago' | 'quitado' | 'recebido';
-      statusLabel: string;
-      isPlanejada?: boolean;
-      isPaidInMonth?: boolean;
-      rawDebt?: Debt;
-      rawFixedExpense?: FixedExpense;
-      rawExpense?: Expense;
-      rawInvoice?: CreditCardInvoice;
-    }> = [];
+    const list: UnifiedFinancialItem[] = [];
+    const { start, end } = activePeriodRange;
+    const isTodos = periodScope === 'todos';
+    const isMesAtual = periodScope === 'mes_atual';
+
+    // Determina os meses que devem ser avaliados para dívidas e despesas fixas
+    const targetMonths = isTodos 
+      ? [selectedMonth] 
+      : isMesAtual 
+      ? [selectedMonth] 
+      : getMonthsInRange(start, end, selectedMonth);
 
     // 1. Financiamentos & Parcelamentos (Debts)
-    debts.forEach(d => {
-      const isSettled = d.status === 'quitado' || d.remainingBalance === 0;
-      const paidExpense = expenses.find(e => e.debtId === d.id && e.date.startsWith(selectedMonth) && e.status === 'pago');
-      const pendingExpense = expenses.find(e => e.debtId === d.id && e.date.startsWith(selectedMonth) && e.status !== 'pago');
-      const monthExpense = paidExpense || pendingExpense;
-      const isPaidThisMonth = isSettled || 
-        Boolean(paidExpense) ||
-        (d.payments && d.payments.some(p => p.date.startsWith(selectedMonth) && (p.status as any) === 'pago'));
+    targetMonths.forEach(targetMonth => {
+      debts.forEach(d => {
+        const isSettled = d.status === 'quitado' || d.remainingBalance === 0;
+        const paidExpense = expenses.find(e => e.debtId === d.id && e.date.startsWith(targetMonth) && e.status === 'pago');
+        const pendingExpense = expenses.find(e => e.debtId === d.id && e.date.startsWith(targetMonth) && e.status !== 'pago');
+        const monthExpense = paidExpense || pendingExpense;
+        const isPaidThisMonth = isSettled || 
+          Boolean(paidExpense) ||
+          (d.payments && d.payments.some(p => p.date.startsWith(targetMonth) && (p.status as any) === 'pago'));
 
-      const isFinanciamento = d.category === 'financiamento_veiculo' || d.category === 'consorcio';
-      const typeLabel = isFinanciamento ? 'Financiamento' : 'Parcelamento / Dívida';
-      const dueDateStr = getDueDateStr(selectedMonth, d.dueDay);
+        const isFinanciamento = d.category === 'financiamento_veiculo' || d.category === 'consorcio';
+        const typeLabel = isFinanciamento ? 'Financiamento' : 'Parcelamento / Dívida';
+        const dueDateStr = getDueDateStr(targetMonth, d.dueDay);
 
-      list.push({
-        id: `debt-${d.id}`,
-        entityType: 'financiamento',
-        categoryBadge: typeLabel,
-        title: d.title,
-        subtitle: `Credor: ${d.creditor || 'Geral'} • Vencimento: Dia ${d.dueDay} de cada mês${isPaidThisMonth && paidExpense ? ` • Liquidado em ${formatDateDisplay(paidExpense.date).fullDate}` : ''}`,
-        amount: d.installmentAmount,
-        totalOriginal: d.totalOriginalAmount,
-        remainingBalance: d.remainingBalance,
-        installmentInfo: d.installmentNumberInMonth 
-          ? `Parcela ${d.installmentNumberInMonth} de ${d.totalInstallments}`
-          : `${d.paidInstallments}/${d.totalInstallments} parcelas quitadas`,
-        dateOrDueDay: `Dia ${d.dueDay}`,
-        rawDate: dueDateStr,
-        status: isSettled ? 'quitado' : (isPaidThisMonth ? 'pago' : 'pendente'),
-        statusLabel: isSettled ? '100% Quitado' : (isPaidThisMonth ? 'Boleto Pago no Mês' : 'A Pagar no Mês'),
-        isPaidInMonth: isPaidThisMonth,
-        rawDebt: d,
-        rawExpense: monthExpense,
+        // Se estiver num período com start e end, verifica se o dueDateStr está no intervalo
+        if (!isTodos && !isMesAtual && !isDateInRange(dueDateStr, start, end)) {
+          return;
+        }
+
+        const idSuffix = targetMonths.length > 1 ? `-${targetMonth}` : '';
+
+        list.push({
+          id: `debt-${d.id}${idSuffix}`,
+          entityType: 'financiamento',
+          categoryBadge: typeLabel,
+          title: d.title,
+          subtitle: `Credor: ${d.creditor || 'Geral'} • Vencimento: Dia ${d.dueDay} de cada mês${isPaidThisMonth && paidExpense ? ` • Liquidado em ${formatDateDisplay(paidExpense.date).fullDate}` : ''}`,
+          amount: d.installmentAmount,
+          totalOriginal: d.totalOriginalAmount,
+          remainingBalance: d.remainingBalance,
+          installmentInfo: d.installmentNumberInMonth 
+            ? `Parcela ${d.installmentNumberInMonth} de ${d.totalInstallments}`
+            : `${d.paidInstallments}/${d.totalInstallments} parcelas quitadas`,
+          dateOrDueDay: `Dia ${d.dueDay}`,
+          rawDate: dueDateStr,
+          status: isSettled ? 'quitado' : (isPaidThisMonth ? 'pago' : 'pendente'),
+          statusLabel: isSettled ? '100% Quitado' : (isPaidThisMonth ? 'Boleto Pago no Mês' : 'A Pagar no Mês'),
+          isPaidInMonth: isPaidThisMonth,
+          rawDebt: d,
+          rawExpense: monthExpense,
+        });
       });
     });
 
     // 2. Entradas Avulsas e Recebimentos (Expenses com type = 'entrada')
-    // Suporte explícito a Planejada (pendente/agendado) e Recebida (recebido)
-    expenses.filter(e => e.type === 'entrada').forEach(e => {
+    expenses.filter(e => {
+      if (e.type !== 'entrada') return false;
+      if (isTodos) return true;
+      if (isMesAtual) return e.date.startsWith(selectedMonth);
+      return isDateInRange(e.date, start, end);
+    }).forEach(e => {
       const catLabel = e.category === 'frete' ? 'Receita Frete' :
                        e.category === 'adiantamento' ? 'Adiantamento' : 'Outra Receita';
       const isPlanejada = e.status === 'pendente' || e.status === 'agendado';
@@ -208,7 +511,12 @@ export const UnifiedFinancialList: React.FC<{
 
     // 3. Faturas de Cartão de Crédito
     expenses
-      .filter(e => e.type === 'saida' && (e.category === 'fatura_cartao' || Boolean(e.creditCardInvoiceId)))
+      .filter(e => {
+        if (e.type !== 'saida' || (e.category !== 'fatura_cartao' && !Boolean(e.creditCardInvoiceId))) return false;
+        if (isTodos) return true;
+        if (isMesAtual) return e.date.startsWith(selectedMonth);
+        return isDateInRange(e.date, start, end);
+      })
       .forEach(e => {
         const isLiquidado = e.status === 'pago';
         const inv = e.creditCardInvoice;
@@ -233,7 +541,12 @@ export const UnifiedFinancialList: React.FC<{
 
     // 4. Despesas Avulsas (Expenses com type = 'saida' exceto faturas, dívidas e fixas)
     expenses
-      .filter(e => e.type === 'saida' && !e.debtId && !e.fixedExpenseId && !e.creditCardInvoiceId && e.category !== 'fatura_cartao')
+      .filter(e => {
+        if (e.type !== 'saida' || e.debtId || e.fixedExpenseId || e.creditCardInvoiceId || e.category === 'fatura_cartao') return false;
+        if (isTodos) return true;
+        if (isMesAtual) return e.date.startsWith(selectedMonth);
+        return isDateInRange(e.date, start, end);
+      })
       .forEach(e => {
         const catLabels: Record<string, string> = {
           pedagio: 'Pedágio',
@@ -262,43 +575,50 @@ export const UnifiedFinancialList: React.FC<{
         });
       });
 
-    // 4. Despesas Fixas Recorrentes (FixedExpenses)
-    fixedExpenses.forEach(f => {
-      // Verifica se há pagamento registrado para esta despesa fixa no mês selecionado
-      const paymentExpense = expenses.find(e => 
-        e.fixedExpenseId === f.id && 
-        e.date.startsWith(selectedMonth) && 
-        e.status === 'pago'
-      );
-      const isPaidThisMonth = Boolean(paymentExpense);
-      const dueDateStr = getDueDateStr(selectedMonth, f.dueDay);
+    // 5. Despesas Fixas Recorrentes (FixedExpenses)
+    targetMonths.forEach(targetMonth => {
+      fixedExpenses.forEach(f => {
+        const paymentExpense = expenses.find(e => 
+          e.fixedExpenseId === f.id && 
+          e.date.startsWith(targetMonth) && 
+          e.status === 'pago'
+        );
+        const isPaidThisMonth = Boolean(paymentExpense);
+        const dueDateStr = getDueDateStr(targetMonth, f.dueDay);
 
-      list.push({
-        id: `fixed-${f.id}`,
-        entityType: 'fixa',
-        categoryBadge: `Despesa Fixa • ${f.category === 'seguro' ? 'Seguro' : 'Recorrente'}`,
-        title: f.description,
-        subtitle: `Beneficiário: ${f.beneficiary || 'Recorrente'} • Vencimento: Dia ${f.dueDay} de cada mês${isPaidThisMonth && paymentExpense ? ` • Liquidado em ${formatDateDisplay(paymentExpense.date).fullDate}` : ''}`,
-        amount: f.amount,
-        dateOrDueDay: `Dia ${f.dueDay}`,
-        rawDate: dueDateStr,
-        status: isPaidThisMonth ? 'pago' : 'pendente',
-        statusLabel: isPaidThisMonth ? 'Pago no Mês' : 'A Pagar no Mês',
-        isPaidInMonth: isPaidThisMonth,
-        rawFixedExpense: f,
-        rawExpense: paymentExpense,
+        // Se estiver num período com start e end, verifica se o dueDateStr está no intervalo
+        if (!isTodos && !isMesAtual && !isDateInRange(dueDateStr, start, end)) {
+          return;
+        }
+
+        const idSuffix = targetMonths.length > 1 ? `-${targetMonth}` : '';
+
+        list.push({
+          id: `fixed-${f.id}${idSuffix}`,
+          entityType: 'fixa',
+          categoryBadge: `Despesa Fixa • ${f.category === 'seguro' ? 'Seguro' : 'Recorrente'}`,
+          title: f.description,
+          subtitle: `Beneficiário: ${f.beneficiary || 'Recorrente'} • Vencimento: Dia ${f.dueDay} de cada mês${isPaidThisMonth && paymentExpense ? ` • Liquidado em ${formatDateDisplay(paymentExpense.date).fullDate}` : ''}`,
+          amount: f.amount,
+          dateOrDueDay: `Dia ${f.dueDay}`,
+          rawDate: dueDateStr,
+          status: isPaidThisMonth ? 'pago' : 'pendente',
+          statusLabel: isPaidThisMonth ? 'Pago no Mês' : 'A Pagar no Mês',
+          isPaidInMonth: isPaidThisMonth,
+          rawFixedExpense: f,
+          rawExpense: paymentExpense,
+        });
       });
     });
 
     return list;
-  }, [debts, expenses, fixedExpenses, selectedMonth]);
+  }, [debts, expenses, fixedExpenses, selectedMonth, activePeriodRange, periodScope]);
 
   // Filtragem dos itens unificados
   const filteredItems = useMemo(() => {
     return allItems.filter(item => {
       // 1. Filtro por Categoria / Tipo de Entidade
       if (categoryFilter === 'todas_despesas') {
-        // Agrupa todas as despesas: fixas, operacionais avulsas e financiamentos
         if (item.entityType === 'entrada') {
           return false;
         }
@@ -318,13 +638,8 @@ export const UnifiedFinancialList: React.FC<{
         }
       }
 
-      // 3. Filtro por Escopo do Mês
-      if (monthScope === 'mes_atual') {
-        if (item.entityType === 'entrada' || item.entityType === 'despesa' || item.entityType === 'fatura_cartao') {
-          if (!item.rawDate.startsWith(selectedMonth)) {
-            return false;
-          }
-        }
+      // 3. Validação do Mês para financiamento quando em mes_atual
+      if (periodScope === 'mes_atual') {
         if (item.entityType === 'financiamento' && item.rawDebt) {
           const d = item.rawDebt;
           if (d.hasBoletoInMonth === false) return false;
@@ -346,7 +661,7 @@ export const UnifiedFinancialList: React.FC<{
 
       return true;
     });
-  }, [allItems, categoryFilter, statusFilter, monthScope, selectedMonth, searchTerm]);
+  }, [allItems, categoryFilter, statusFilter, periodScope, searchTerm]);
 
   // Contadores para as tabs de filtros
   const counts = useMemo(() => {
@@ -375,10 +690,7 @@ export const UnifiedFinancialList: React.FC<{
       } else if (categoryFilter !== 'todos' && item.entityType !== categoryFilter) {
         return false;
       }
-      if (monthScope === 'mes_atual') {
-        if (item.entityType === 'entrada' || item.entityType === 'despesa' || item.entityType === 'fatura_cartao') {
-          if (!item.rawDate.startsWith(selectedMonth)) return false;
-        }
+      if (periodScope === 'mes_atual') {
         if (item.entityType === 'financiamento' && item.rawDebt) {
           const d = item.rawDebt;
           if (d.hasBoletoInMonth === false) return false;
@@ -400,7 +712,7 @@ export const UnifiedFinancialList: React.FC<{
       pendentes,
       pagos,
     };
-  }, [allItems, categoryFilter, monthScope, selectedMonth]);
+  }, [allItems, categoryFilter, periodScope]);
 
   // Totais da visualização filtrada (com distinção de entradas recebidas vs planejadas e sub-divisão de despesas)
   const filteredTotals = useMemo(() => {
@@ -613,41 +925,80 @@ export const UnifiedFinancialList: React.FC<{
           </div>
         </div>
 
-        {/* Linha 2: Barra de Pesquisa e Escopo do Mês */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="relative flex-1 min-w-[240px]">
-            <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
-            <input
-              type="text"
-              value={searchTerm}
-              onChange={e => setSearchTerm(e.target.value)}
-              placeholder="Pesquisar por título, credor, fornecedor, descrição..."
-              className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
-            />
+        {/* Linha 2: Barra de Pesquisa e Filtro de Período de Exibição */}
+        <div className="flex flex-col gap-2.5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            {/* Campo de Pesquisa */}
+            <div className="relative flex-1 min-w-[240px]">
+              <Search className="w-4 h-4 text-slate-500 absolute left-3 top-1/2 -translate-y-1/2" />
+              <input
+                type="text"
+                value={searchTerm}
+                onChange={e => setSearchTerm(e.target.value)}
+                placeholder="Pesquisar por título, credor, fornecedor, descrição..."
+                className="w-full pl-9 pr-3 py-1.5 rounded-xl bg-slate-950/70 border border-slate-800 text-xs text-white placeholder:text-slate-500 focus:outline-none focus:border-sky-500"
+              />
+            </div>
+
+            {/* Seletor de Períodos Rápidos */}
+            <div className="flex items-center gap-1 overflow-x-auto pb-1 sm:pb-0 max-w-full">
+              {[
+                { id: 'mes_atual', label: `Mês (${selectedMonth})`, title: `Exibir registros do mês selecionado (${selectedMonth})` },
+                { id: 'hoje', label: 'Hoje', title: 'Exibir despesas e vencimentos de hoje' },
+                { id: 'esta_semana', label: 'Esta Semana', title: 'Exibir da segunda-feira ao domingo desta semana' },
+                { id: 'proxima_semana', label: 'Próxima Semana (7d)', title: 'Exibir vencimentos dos próximos 7 dias' },
+                { id: 'proximos_15_dias', label: 'Próximos 15d', title: 'Exibir vencimentos dos próximos 15 dias' },
+                { id: 'proximos_30_dias', label: 'Próximos 30d', title: 'Exibir vencimentos dos próximos 30 dias' },
+                { id: 'personalizado', label: 'Personalizado', title: 'Definir intervalo de datas específico' },
+                { id: 'todos', label: 'Histórico Completo', title: 'Exibir todos os registros históricos sem restrição' },
+              ].map(p => {
+                const isActive = periodScope === p.id;
+                return (
+                  <button
+                    key={p.id}
+                    onClick={() => setPeriodScope(p.id as PeriodScope)}
+                    title={p.title}
+                    className={`px-2.5 py-1 rounded-lg font-semibold text-xs whitespace-nowrap transition-all shrink-0 ${
+                      isActive
+                        ? 'bg-sky-500/20 border border-sky-500/50 text-sky-300 shadow-sm'
+                        : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200 hover:border-slate-700'
+                    }`}
+                  >
+                    {p.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-slate-400">Período:</span>
-            <button
-              onClick={() => setMonthScope('mes_atual')}
-              className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-all ${
-                monthScope === 'mes_atual'
-                  ? 'bg-sky-500/20 border border-sky-500/40 text-sky-300'
-                  : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Mês Selecionado ({selectedMonth})
-            </button>
-            <button
-              onClick={() => setMonthScope('todos')}
-              className={`px-2.5 py-1 rounded-lg font-semibold text-xs transition-all ${
-                monthScope === 'todos'
-                  ? 'bg-sky-500/20 border border-sky-500/40 text-sky-300'
-                  : 'bg-slate-950 border border-slate-800 text-slate-400 hover:text-slate-200'
-              }`}
-            >
-              Histórico Completo
-            </button>
+          {/* Sub-barra: Intervalo Personalizado & Indicador do Intervalo Ativo */}
+          <div className="flex flex-wrap items-center justify-between gap-2 px-3 py-1.5 rounded-xl bg-slate-950/40 border border-slate-800/70 text-xs">
+            <div className="flex items-center gap-2 text-slate-400">
+              <CalendarDays className="w-3.5 h-3.5 text-sky-400 shrink-0" />
+              <span>Período ativo:</span>
+              <span className="font-semibold text-sky-300 font-sans">
+                {activePeriodRange.label}
+              </span>
+            </div>
+
+            {periodScope === 'personalizado' && (
+              <div className="flex items-center gap-2">
+                <span className="text-[11px] text-slate-400">De:</span>
+                <input
+                  type="date"
+                  value={customStartDate}
+                  onChange={e => setCustomStartDate(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs focus:outline-none focus:border-sky-500"
+                />
+                <span className="text-[11px] text-slate-400">Até:</span>
+                <input
+                  type="date"
+                  value={customEndDate}
+                  onChange={e => setCustomEndDate(e.target.value)}
+                  className="bg-slate-900 border border-slate-700 text-white rounded-lg px-2 py-0.5 text-xs focus:outline-none focus:border-sky-500"
+                />
+              </div>
+            )}
           </div>
         </div>
 
@@ -767,13 +1118,57 @@ export const UnifiedFinancialList: React.FC<{
           </button>
         </div>
 
-        <div className="text-xs text-slate-400 font-medium">
-          Exibindo <strong className="text-white font-mono">{sortedItems.length}</strong> registro(s)
+        <div className="flex items-center gap-3">
+          <div className="text-xs text-slate-400 font-medium">
+            Exibindo <strong className="text-white font-mono">{sortedItems.length}</strong> registro(s)
+          </div>
+
+          {/* Toggle de Modo de Visualização (Lista vs Kanban) */}
+          <div className="flex items-center bg-slate-950 p-1 rounded-xl border border-slate-800">
+            <button
+              type="button"
+              onClick={() => setViewMode('lista')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'lista'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Visualização em Lista"
+            >
+              <List className="w-3.5 h-3.5" />
+              <span>Lista</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setViewMode('kanban')}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-lg text-xs font-bold transition-all ${
+                viewMode === 'kanban'
+                  ? 'bg-sky-600 text-white shadow-md shadow-sky-600/30'
+                  : 'text-slate-400 hover:text-white'
+              }`}
+              title="Visualização em Quadro Kanban"
+            >
+              <Kanban className="w-3.5 h-3.5" />
+              <span>Kanban</span>
+            </button>
+          </div>
         </div>
       </div>
 
-      {/* Listagem dos Itens Filtrados e Ordenados */}
-      <div className="space-y-2.5">
+      {viewMode === 'kanban' ? (
+        <ExpensesKanban
+          items={sortedItems}
+          onPayItem={handlePayItem}
+          onUnpayItem={handleUnpayItem}
+          onEditItem={handleEditItem}
+          onDeleteItem={handleDeleteItem}
+          onInspectInvoice={handleInspectInvoice}
+          categoryFilter={categoryFilter}
+          selectedMonth={selectedMonth}
+        />
+      ) : (
+        /* Listagem dos Itens Filtrados e Ordenados */
+        <div className="space-y-2.5">
         {sortedItems.length === 0 ? (
           <div className="p-12 text-center rounded-2xl bg-slate-900/40 border border-slate-800">
             <CheckCircle2 className={`w-10 h-10 mx-auto mb-2 ${statusFilter === 'pendentes' ? 'text-emerald-400' : 'text-slate-600'}`} />
@@ -1094,7 +1489,8 @@ export const UnifiedFinancialList: React.FC<{
             );
           })
         )}
-      </div>
+        </div>
+      )}
 
       <FixedExpenseModal
         isOpen={!!editingFixedExpense}
