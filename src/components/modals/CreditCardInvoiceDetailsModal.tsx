@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CreditCardInvoice, CreditCardInvoiceItem } from '../../types';
+import { CreditCardInvoice, CreditCardInvoiceItem, ExpenseCategory } from '../../types';
 import { useFinance } from '../../context/FinanceContext';
 import { 
   X, 
@@ -11,7 +11,9 @@ import {
   Clock, 
   Plus, 
   Layers,
-  RotateCcw
+  RotateCcw,
+  DollarSign,
+  AlertCircle
 } from 'lucide-react';
 
 interface CreditCardInvoiceDetailsModalProps {
@@ -27,17 +29,29 @@ export const CreditCardInvoiceDetailsModal: React.FC<CreditCardInvoiceDetailsMod
   invoice,
   onAddNewPurchase,
 }) => {
-  const { payInvoice, unpayInvoice, deleteInvoiceItem, deleteInvoice } = useFinance();
+  const { payInvoice, unpayInvoice, deleteInvoiceItem, deleteInvoice, addInvoiceItem, invoices } = useFinance();
   const [deletingItemId, setDeletingItemId] = useState<string | null>(null);
+
+  // Estado para formulário direto de adicionar compra nesta fatura
+  const [isAddingPurchase, setIsAddingPurchase] = useState(false);
+  const [purchaseDescription, setPurchaseDescription] = useState('');
+  const [purchaseCategory, setPurchaseCategory] = useState<ExpenseCategory>('manutencao');
+  const [purchaseAmount, setPurchaseAmount] = useState<number | string>('');
+  const [purchaseInstallments, setPurchaseInstallments] = useState<number>(1);
+  const [purchaseDate, setPurchaseDate] = useState<string>(new Date().toISOString().split('T')[0]);
+  const [purchaseNotes, setPurchaseNotes] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   if (!isOpen || !invoice) return null;
 
-  const items = invoice.items || [];
-  const totalAmount = invoice.totalAmount !== undefined 
-    ? invoice.totalAmount 
+  // Busca sempre os dados mais recentes da fatura a partir do contexto
+  const liveInvoice = invoices.find(i => i.id === invoice.id) || invoice;
+  const items = liveInvoice.items || [];
+  const totalAmount = liveInvoice.totalAmount !== undefined 
+    ? liveInvoice.totalAmount 
     : items.reduce((sum, item) => sum + item.amount, 0);
 
-  const isPaid = invoice.status === 'pago';
+  const isPaid = liveInvoice.status === 'pago';
 
   const categoryLabels: Record<string, string> = {
     combustivel: 'Combustível',
@@ -53,11 +67,11 @@ export const CreditCardInvoiceDetailsModal: React.FC<CreditCardInvoiceDetailsMod
 
   const handleToggleStatus = async () => {
     if (isPaid) {
-      if (window.confirm(`Estornar o pagamento da fatura "${invoice.cardName}" (${invoice.month}) para Pendente?`)) {
-        await unpayInvoice(invoice.id);
+      if (window.confirm(`Estornar o pagamento da fatura "${liveInvoice.cardName}" (${liveInvoice.month}) para Pendente?`)) {
+        await unpayInvoice(liveInvoice.id);
       }
     } else {
-      await payInvoice(invoice.id);
+      await payInvoice(liveInvoice.id);
     }
   };
 
@@ -79,11 +93,51 @@ export const CreditCardInvoiceDetailsModal: React.FC<CreditCardInvoiceDetailsMod
   };
 
   const handleDeleteEntireInvoice = async () => {
-    if (window.confirm(`Tem certeza que deseja excluir toda a fatura "${invoice.cardName}" de ${invoice.month} e seus lançamentos financeiros?`)) {
-      await deleteInvoice(invoice.id);
+    if (window.confirm(`Tem certeza que deseja excluir toda a fatura "${liveInvoice.cardName}" de ${liveInvoice.month} e seus lançamentos financeiros?`)) {
+      await deleteInvoice(liveInvoice.id);
       onClose();
     }
   };
+
+  const handleAddPurchaseSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!purchaseDescription.trim()) {
+      alert('Por favor, informe a descrição da compra.');
+      return;
+    }
+
+    const val = Number(purchaseAmount);
+    if (isNaN(val) || val <= 0) {
+      alert('Por favor, informe um valor válido para a compra.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      await addInvoiceItem(liveInvoice.id, {
+        description: purchaseDescription.trim(),
+        category: purchaseCategory,
+        totalAmount: val,
+        totalInstallments: Math.max(1, Number(purchaseInstallments) || 1),
+        purchaseDate: purchaseDate || liveInvoice.dueDate,
+        notes: purchaseNotes.trim() || undefined,
+      });
+
+      // Limpa os campos e fecha o formulário inline
+      setPurchaseDescription('');
+      setPurchaseAmount('');
+      setPurchaseInstallments(1);
+      setPurchaseNotes('');
+      setPurchaseDate(new Date().toISOString().split('T')[0]);
+      setIsAddingPurchase(false);
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const numInst = Math.max(1, Number(purchaseInstallments) || 1);
+  const numTot = Number(purchaseAmount) || 0;
+  const instVal = numTot > 0 ? numTot / numInst : 0;
 
   return (
     <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-slate-950/80 backdrop-blur-sm p-0 sm:p-4 overflow-y-auto">
@@ -96,7 +150,7 @@ export const CreditCardInvoiceDetailsModal: React.FC<CreditCardInvoiceDetailsMod
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-base font-bold text-white">Fatura: {invoice.cardName}</h2>
+                <h2 className="text-base font-bold text-white">Fatura: {liveInvoice.cardName}</h2>
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold flex items-center gap-1 border ${
                   isPaid 
                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
@@ -107,9 +161,9 @@ export const CreditCardInvoiceDetailsModal: React.FC<CreditCardInvoiceDetailsMod
                 </span>
               </div>
               <p className="text-xs text-slate-400 mt-0.5 flex items-center gap-2">
-                <span>Mês: <strong className="text-slate-300">{invoice.month}</strong></span>
+                <span>Mês: <strong className="text-slate-300">{liveInvoice.month}</strong></span>
                 <span>•</span>
-                <span>Vencimento: <strong className="text-slate-300">{invoice.dueDate}</strong></span>
+                <span>Vencimento: <strong className="text-slate-300">{liveInvoice.dueDate}</strong></span>
               </p>
             </div>
           </div>
@@ -149,20 +203,169 @@ export const CreditCardInvoiceDetailsModal: React.FC<CreditCardInvoiceDetailsMod
               <span>{isPaid ? 'Estornar Pagamento' : 'Pagar Fatura'}</span>
             </button>
 
-            {onAddNewPurchase && (
-              <button
-                onClick={() => {
-                  onAddNewPurchase(invoice.cardName, invoice.month, invoice.dueDate);
-                  onClose();
-                }}
-                className="px-3 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-95"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>+ Adicionar Compra</span>
-              </button>
-            )}
+            <button
+              onClick={() => setIsAddingPurchase(prev => !prev)}
+              className={`px-3 py-2 rounded-xl text-xs font-bold transition-all shadow-sm flex items-center gap-1.5 active:scale-95 border ${
+                isAddingPurchase
+                  ? 'bg-slate-800 hover:bg-slate-700 border-slate-700 text-slate-300'
+                  : 'bg-indigo-500/15 hover:bg-indigo-500/25 border-indigo-500/30 text-indigo-300'
+              }`}
+            >
+              {isAddingPurchase ? <X className="w-3.5 h-3.5" /> : <Plus className="w-3.5 h-3.5" />}
+              <span>{isAddingPurchase ? 'Fechar Inclusão' : '+ Incluir Nova Compra'}</span>
+            </button>
           </div>
         </div>
+
+        {/* Formulário Inline para Incluir Compra Nesta Fatura */}
+        {isAddingPurchase && (
+          <form 
+            onSubmit={handleAddPurchaseSubmit}
+            className="p-4 rounded-xl bg-indigo-950/20 border border-indigo-500/30 mb-4 space-y-3 shrink-0 animate-in fade-in slide-in-from-top-2 duration-150"
+          >
+            <div className="flex items-center justify-between border-b border-indigo-500/20 pb-2">
+              <span className="text-xs font-bold text-indigo-300 flex items-center gap-1.5">
+                <Plus className="w-4 h-4" />
+                <span>Incluir Compra nesta Fatura ({liveInvoice.cardName} • {liveInvoice.month})</span>
+              </span>
+              <span className="text-[11px] text-slate-400">
+                Não cria nova fatura, adiciona direto nesta
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-12 gap-2.5">
+              <div className="sm:col-span-6">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Descrição da Compra *
+                </label>
+                <input
+                  type="text"
+                  required
+                  autoFocus
+                  value={purchaseDescription}
+                  onChange={e => setPurchaseDescription(e.target.value)}
+                  placeholder="Ex: Peças para freio, Combustível Graal, Troca de óleo..."
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Categoria
+                </label>
+                <select
+                  value={purchaseCategory}
+                  onChange={e => setPurchaseCategory(e.target.value as ExpenseCategory)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value="manutencao">Manutenção</option>
+                  <option value="combustivel">Combustível</option>
+                  <option value="arla32">Arla 32</option>
+                  <option value="borracharia">Borracharia</option>
+                  <option value="alimentacao_estadia">Alimentação/Estadia</option>
+                  <option value="pedagio">Pedágio</option>
+                  <option value="taxas_impostos">Taxas/Impostos</option>
+                  <option value="outros">Outros</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-3">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Data da Compra
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={purchaseDate}
+                  onChange={e => setPurchaseDate(e.target.value)}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="sm:col-span-4">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Valor Total da Compra (R$) *
+                </label>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0.01"
+                  required
+                  value={purchaseAmount}
+                  onChange={e => setPurchaseAmount(e.target.value)}
+                  placeholder="0,00"
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-indigo-300 font-mono font-bold focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+
+              <div className="sm:col-span-4">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Parcelamento
+                </label>
+                <select
+                  value={purchaseInstallments}
+                  onChange={e => setPurchaseInstallments(Number(e.target.value))}
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                >
+                  <option value={1}>1x (À Vista)</option>
+                  <option value={2}>2x</option>
+                  <option value={3}>3x</option>
+                  <option value={4}>4x</option>
+                  <option value={5}>5x</option>
+                  <option value={6}>6x</option>
+                  <option value={7}>7x</option>
+                  <option value={8}>8x</option>
+                  <option value={9}>9x</option>
+                  <option value={10}>10x</option>
+                  <option value={12}>12x</option>
+                  <option value={18}>18x</option>
+                  <option value={24}>24x</option>
+                </select>
+              </div>
+
+              <div className="sm:col-span-4">
+                <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                  Observações (Opcional)
+                </label>
+                <input
+                  type="text"
+                  value={purchaseNotes}
+                  onChange={e => setPurchaseNotes(e.target.value)}
+                  placeholder="Ex: NF 1234, garantia 90 dias..."
+                  className="w-full px-2.5 py-1.5 rounded-lg bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                />
+              </div>
+            </div>
+
+            {/* Informação explicativa quando for parcelada */}
+            {numInst > 1 && numTot > 0 && (
+              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-[11px] text-purple-300">
+                <Layers className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span>
+                  <strong>{numInst}x de {instVal.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</strong>: A 1ª parcela entra nesta fatura ({liveInvoice.month}) e as próximas {numInst - 1} parcelas serão distribuídas nos meses seguintes automaticamente.
+                </span>
+              </div>
+            )}
+
+            <div className="flex items-center justify-end gap-2 pt-2 border-t border-indigo-500/20">
+              <button
+                type="button"
+                onClick={() => setIsAddingPurchase(false)}
+                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs font-semibold transition-all"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                disabled={isSubmitting}
+                className="flex items-center gap-1.5 px-4 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold transition-all shadow-md active:scale-95 disabled:opacity-50"
+              >
+                <CheckCircle2 className="w-3.5 h-3.5" />
+                <span>{isSubmitting ? 'Salvando...' : 'Adicionar à Fatura'}</span>
+              </button>
+            </div>
+          </form>
+        )}
 
         {/* Lista de Compras Inclusas na Fatura */}
         <div className="flex-1 overflow-y-auto space-y-2.5 pr-1">

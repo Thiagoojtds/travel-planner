@@ -25,6 +25,7 @@ interface FinanceContextType {
   updateExpense: (id: string, data: Partial<Expense>) => Promise<Expense>;
   deleteExpense: (id: string) => Promise<void>;
   addInvoice: (data: any) => Promise<CreditCardInvoice>;
+  addInvoiceItem: (invoiceId: string, itemData: any) => Promise<CreditCardInvoice>;
   payInvoice: (id: string) => Promise<void>;
   unpayInvoice: (id: string) => Promise<void>;
   deleteInvoice: (id: string) => Promise<void>;
@@ -261,6 +262,19 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
     }
   };
 
+  const addInvoiceItem = async (invoiceId: string, itemData: any): Promise<CreditCardInvoice> => {
+    try {
+      const updated = await api.post<CreditCardInvoice>(`/invoices/${invoiceId}/items`, itemData);
+      showToast('Compra adicionada à fatura com sucesso!', 'success');
+      await loadFinanceData();
+      triggerRefresh();
+      return updated;
+    } catch (err: any) {
+      showToast(err.message || 'Erro ao adicionar compra à fatura', 'error');
+      throw err;
+    }
+  };
+
   const payInvoice = async (id: string) => {
     try {
       await api.post(`/invoices/${id}/pay`);
@@ -332,6 +346,7 @@ export const FinanceProvider: React.FC<{ children: ReactNode }> = ({ children })
         updateExpense,
         deleteExpense,
         addInvoice,
+        addInvoiceItem,
         payInvoice,
         unpayInvoice,
         deleteInvoice,

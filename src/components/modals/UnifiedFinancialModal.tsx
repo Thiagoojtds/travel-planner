@@ -40,11 +40,37 @@ export const UnifiedFinancialModal: React.FC<UnifiedFinancialModalProps> = ({
   initialMonth,
   initialDueDate,
 }) => {
-  const { addDebt, addExpense, addFixedExpense, addInvoice } = useFinance();
+  const { addDebt, addExpense, addFixedExpense, addInvoice, addInvoiceItem, invoices } = useFinance();
   const { freights } = useFreights();
   const { selectedMonth } = useApp();
 
   const [activeType, setActiveType] = useState<FinancialModalType>(defaultType);
+
+  // Estados para modo de fatura de cartão (existente vs nova)
+  const [invoiceMode, setInvoiceMode] = useState<'existente' | 'nova'>('existente');
+  const [selectedInvoiceId, setSelectedInvoiceId] = useState<string>('');
+
+  useEffect(() => {
+    if (invoices && invoices.length > 0) {
+      if (initialCardName) {
+        const match = invoices.find(i => 
+          i.cardName.toLowerCase() === initialCardName.toLowerCase() && 
+          (!initialMonth || i.month === initialMonth)
+        );
+        if (match) {
+          setSelectedInvoiceId(match.id);
+          setInvoiceMode('existente');
+          return;
+        }
+      }
+      if (!selectedInvoiceId || !invoices.some(i => i.id === selectedInvoiceId)) {
+        setSelectedInvoiceId(invoices[0].id);
+      }
+      setInvoiceMode('existente');
+    } else {
+      setInvoiceMode('nova');
+    }
+  }, [invoices, initialCardName, initialMonth, isOpen]);
 
   // Estados para Financiamento / Parcelamento / Dívida
   const [debtTitle, setDebtTitle] = useState('');
@@ -242,21 +268,33 @@ export const UnifiedFinancialModal: React.FC<UnifiedFinancialModalProps> = ({
         };
       });
 
-      const parts = (invoiceMonth || '').split('-');
-      const y = parts[0] || '2026';
-      const m = parts[1] || '10';
-      const d = String(Math.min(31, Math.max(1, Number(invoiceDueDay) || 15))).padStart(2, '0');
-      const invoiceDueDate = `${y}-${m}-${d}`;
+      if (invoiceMode === 'existente' && selectedInvoiceId) {
+        const targetInvoice = invoices.find(inv => inv.id === selectedInvoiceId) || invoices[0];
+        if (!targetInvoice) {
+          alert('Por favor, selecione uma fatura existente ou alterne para criar nova fatura.');
+          return;
+        }
 
-      await addInvoice({
-        cardName: invoiceCardName.trim() || 'Cartão de Crédito',
-        month: invoiceMonth,
-        dueDate: invoiceDueDate,
-        dueDay: Number(invoiceDueDay) || 15,
-        status: invoiceStatus,
-        notes: invoiceNotes || undefined,
-        items: formattedItems,
-      });
+        for (const item of formattedItems) {
+          await addInvoiceItem(targetInvoice.id, item);
+        }
+      } else {
+        const parts = (invoiceMonth || '').split('-');
+        const y = parts[0] || '2026';
+        const m = parts[1] || '10';
+        const d = String(Math.min(31, Math.max(1, Number(invoiceDueDay) || 15))).padStart(2, '0');
+        const invoiceDueDate = `${y}-${m}-${d}`;
+
+        await addInvoice({
+          cardName: invoiceCardName.trim() || 'Cartão de Crédito',
+          month: invoiceMonth,
+          dueDate: invoiceDueDate,
+          dueDay: Number(invoiceDueDay) || 15,
+          status: invoiceStatus,
+          notes: invoiceNotes || undefined,
+          items: formattedItems,
+        });
+      }
     }
 
     onClose();
@@ -883,95 +921,181 @@ export const UnifiedFinancialModal: React.FC<UnifiedFinancialModalProps> = ({
           {/* ======================================================== */}
           {activeType === 'fatura_cartao' && (
             <div className="space-y-4 animate-in fade-in duration-150">
-              {/* Cabeçalho da Fatura: Cartão, Mês e Vencimento */}
-              <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div className="sm:col-span-1">
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Nome do Cartão *
-                    </label>
-                    <input
-                      type="text"
-                      required
-                      value={invoiceCardName}
-                      onChange={e => setInvoiceCardName(e.target.value)}
-                      placeholder="Ex: Nubank PJ, Itaú, Santander"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                    />
-                    {/* Sugestões rápidas */}
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {['Nubank PJ', 'Itaú Frota', 'Santander', 'Bradesco'].map(name => (
-                        <button
-                          key={name}
-                          type="button"
-                          onClick={() => setInvoiceCardName(name)}
-                          className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800/80 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-300 transition-colors"
-                        >
-                          {name}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Mês de Referência *
-                    </label>
-                    <input
-                      type="month"
-                      required
-                      value={invoiceMonth}
-                      onChange={e => setInvoiceMonth(e.target.value)}
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Dia de Vencimento *
-                    </label>
-                    <input
-                      type="number"
-                      min={1}
-                      max={31}
-                      required
-                      value={invoiceDueDay}
-                      onChange={e => setInvoiceDueDay(e.target.value)}
-                      placeholder="15"
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
-                    />
-                  </div>
+              {/* Se houver faturas cadastradas, oferece a escolha entre incluir compras ou criar nova fatura */}
+              {invoices && invoices.length > 0 && (
+                <div className="flex items-center gap-2 p-1 bg-slate-950/80 rounded-xl border border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceMode('existente')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      invoiceMode === 'existente'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <CreditCard className="w-3.5 h-3.5" />
+                    <span>Incluir em Fatura Existente ({invoices.length})</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setInvoiceMode('nova')}
+                    className={`flex-1 py-1.5 px-3 rounded-lg text-xs font-bold transition-all flex items-center justify-center gap-1.5 ${
+                      invoiceMode === 'nova'
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30'
+                        : 'text-slate-400 hover:text-white'
+                    }`}
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>Cadastrar Nova Fatura</span>
+                  </button>
                 </div>
+              )}
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-800/60">
+              {/* Modo 1: Incluir em Fatura Existente */}
+              {invoiceMode === 'existente' && invoices && invoices.length > 0 ? (
+                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Status da Fatura
+                      Selecione a Fatura Cadastrada *
                     </label>
                     <select
-                      value={invoiceStatus}
-                      onChange={e => setInvoiceStatus(e.target.value as any)}
+                      value={selectedInvoiceId}
+                      onChange={e => setSelectedInvoiceId(e.target.value)}
                       className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
                     >
-                      <option value="pendente">Pendente (A Pagar no Mês)</option>
-                      <option value="pago">Já Paga / Liquidada</option>
+                      {invoices.map(inv => (
+                        <option key={inv.id} value={inv.id}>
+                          {inv.cardName} • Mês {inv.month} (Vencimento: {inv.dueDate}) — Total: {(inv.totalAmount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                        </option>
+                      ))}
                     </select>
                   </div>
 
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">
-                      Observações / Anotações
-                    </label>
-                    <input
-                      type="text"
-                      value={invoiceNotes}
-                      onChange={e => setInvoiceNotes(e.target.value)}
-                      placeholder="Limite do cartão, fatura fechada..."
-                      className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
-                    />
+                  {(() => {
+                    const selInv = invoices.find(i => i.id === selectedInvoiceId) || invoices[0];
+                    if (!selInv) return null;
+                    return (
+                      <div className="p-3 rounded-xl bg-indigo-950/20 border border-indigo-500/20 flex flex-wrap items-center justify-between gap-3">
+                        <div>
+                          <div className="text-xs font-bold text-white flex items-center gap-2">
+                            <span>{selInv.cardName}</span>
+                            <span className={`px-2 py-0.5 rounded-full text-[10px] font-semibold border ${
+                              selInv.status === 'pago'
+                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                                : 'bg-amber-500/10 text-amber-400 border-amber-500/20'
+                            }`}>
+                              {selInv.status === 'pago' ? 'Fatura Paga' : 'A Pagar'}
+                            </span>
+                          </div>
+                          <div className="text-[11px] text-slate-400 mt-0.5">
+                            Mês: <strong className="text-slate-300">{selInv.month}</strong> • Vencimento: <strong className="text-slate-300">{selInv.dueDate}</strong>
+                          </div>
+                        </div>
+
+                        <div className="text-right">
+                          <div className="text-[10px] uppercase font-bold text-slate-400">Total Atual da Fatura</div>
+                          <div className="font-mono text-sm sm:text-base font-bold text-indigo-400">
+                            {(selInv.totalAmount || 0).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}
+                          </div>
+                          <div className="text-[10px] text-slate-500">
+                            {selInv.items?.length || 0} compras já inclusas
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })()}
+                </div>
+              ) : (
+                /* Modo 2: Criar Nova Fatura */
+                <div className="p-3.5 rounded-xl bg-slate-950/60 border border-slate-800 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="sm:col-span-1">
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Nome do Cartão *
+                      </label>
+                      <input
+                        type="text"
+                        required
+                        value={invoiceCardName}
+                        onChange={e => setInvoiceCardName(e.target.value)}
+                        placeholder="Ex: Nubank PJ, Itaú, Santander"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      />
+                      {/* Sugestões rápidas */}
+                      <div className="flex flex-wrap gap-1 mt-1.5">
+                        {['Nubank PJ', 'Itaú Frota', 'Santander', 'Bradesco'].map(name => (
+                          <button
+                            key={name}
+                            type="button"
+                            onClick={() => setInvoiceCardName(name)}
+                            className="px-1.5 py-0.5 rounded text-[10px] bg-slate-800/80 hover:bg-indigo-500/20 text-slate-400 hover:text-indigo-300 transition-colors"
+                          >
+                            {name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Mês de Referência *
+                      </label>
+                      <input
+                        type="month"
+                        required
+                        value={invoiceMonth}
+                        onChange={e => setInvoiceMonth(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Dia de Vencimento *
+                      </label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        required
+                        value={invoiceDueDay}
+                        onChange={e => setInvoiceDueDay(e.target.value)}
+                        placeholder="15"
+                        className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white font-mono focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1 border-t border-slate-800/60">
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Status da Fatura
+                      </label>
+                      <select
+                        value={invoiceStatus}
+                        onChange={e => setInvoiceStatus(e.target.value as any)}
+                        className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white focus:outline-none focus:border-indigo-500"
+                      >
+                        <option value="pendente">Pendente (A Pagar no Mês)</option>
+                        <option value="pago">Já Paga / Liquidada</option>
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        Observações / Anotações
+                      </label>
+                      <input
+                        type="text"
+                        value={invoiceNotes}
+                        onChange={e => setInvoiceNotes(e.target.value)}
+                        placeholder="Limite do cartão, fatura fechada..."
+                        className="w-full px-3 py-2 rounded-xl bg-slate-800 border border-slate-700 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-indigo-500"
+                      />
+                    </div>
                   </div>
                 </div>
-              </div>
+              )}
 
               {/* Seção de Compras Inclusas na Fatura */}
               <div className="space-y-3">
@@ -1166,7 +1290,7 @@ export const UnifiedFinancialModal: React.FC<UnifiedFinancialModalProps> = ({
               <CheckCircle2 className="w-4 h-4" />
               <span>
                 {activeType === 'financiamento' ? 'Cadastrar Financiamento' :
-                 activeType === 'fatura_cartao' ? 'Registrar Fatura e Parcelas' :
+                 activeType === 'fatura_cartao' ? (invoiceMode === 'existente' ? 'Incluir Compras na Fatura' : 'Registrar Fatura e Parcelas') :
                  activeType === 'entrada' ? 'Confirmar Entrada' :
                  activeType === 'despesa' ? 'Confirmar Despesa' :
                  'Salvar Despesa Fixa'}

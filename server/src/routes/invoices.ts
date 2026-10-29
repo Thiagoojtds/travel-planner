@@ -345,6 +345,185 @@ router.post('/:id/unpay', async (req: Request, res: Response) => {
   }
 });
 
+// POST /api/invoices/:id/items - Adicionar compras a uma fatura já existente (suporta parcelamento futuro)
+router.post('/:id/items', async (req: Request, res: Response) => {
+  try {
+    const { id } = req.params;
+    const currentInvoice = await prisma.creditCardInvoice.findUnique({
+      where: { id },
+      include: { items: true }
+    });
+
+    if (!currentInvoice) {
+      return res.status(404).json({ error: 'Fatura não encontrada' });
+    }
+
+    const rawItems = Array.isArray(req.body.items) 
+      ? req.body.items 
+      : [req.body];
+
+    const { cardName, month, dueDate } = currentInvoice;
+    const dueDay = dueDate ? Number(String(dueDate).slice(8, 10)) : 10;
+
+    for (const item of rawItems) {
+      if (!item.description || (Number(item.amount) <= 0 && Number(item.totalAmount) <= 0)) {
+        continue;
+      }
+      const totalInst = Math.max(1, Number(item.totalInstallments || item.installments || 1));
+      const currInst = Math.max(1, Number(item.currentInstallment || 1));
+      const purchaseAmount = Number(item.amount || 0);
+      const totalAmount = Number(item.totalAmount || (purchaseAmount * totalInst));
+      const installmentVal = purchaseAmount > 0 
+        ? purchaseAmount 
+        : (totalInst > 0 ? totalAmount / totalInst : 0);
+      const parentId = item.parentPurchaseId || crypto.randomUUID();
+      const pDate = item.purchaseDate || dueDate || new Date().toISOString().split('T')[0];
+
+      // Item na fatura corrente
+      await prisma.creditCardInvoiceItem.create({
+        data: {
+          invoiceId: currentInvoice.id,
+          description: item.description,
+          category: item.category || 'outros',
+          amount: installmentVal,
+          totalAmount,
+          purchaseDate: pDate,
+          currentInstallment: currInst,
+          totalInstallments: totalInst,
+          parentPurchaseId: parentId,
+          notes: item.notes || null,
+        }
+      });
+
+      // Se for parcelado, gera faturas e itens dos próximos meses
+      if (totalInst > currInst) {
+        const remainingMonths = totalInst - currInst;
+        for (let k = 1; k <= remainingMonths; k++) {
+          const futureMonth = addMonths(month, k);
+          const futureDueDate = getDueDate(futureMonth, dueDay);
+
+          let futureInvoice = await prisma.creditCardInvoice.findFirst({
+            where: {
+              cardName,
+              month: futureMonth,
+            }
+          });
+
+          if (!futureInvoice) {
+            futureInvoice = await prisma.creditCardInvoice.create({
+              data: {
+                cardName,
+                month: futureMonth,
+                dueDate: futureDueDate,
+                status: 'pendente',
+              }
+            });
+          }
+
+          await prisma.creditCardInvoiceItem.create({
+            data: {
+              invoiceId: futureInvoice.id,
+              description: item.description,
+              category: item.category || 'outros',
+              amount: installmentVal,
+              totalAmount,
+              purchaseDate: pDate,
+              currentInstallment: currInst + k,
+              totalInstallments: totalInst,
+              parentPurchaseId: parentId,
+              notes: item.notes || null,
+            }
+          });
+
+          // Atualiza total e expense vinculado da fatura futura
+          const futureItems = await prisma.creditCardInvoiceItem.findMany({
+            where: { invoiceId: futureInvoice.id }
+          });
+          const futureTotal = futureItems.reduce((acc, it) => acc + it.amount, 0);
+
+          const existingFutureExp = await prisma.expense.findFirst({
+            where: { creditCardInvoiceId: futureInvoice.id }
+          });
+
+          if (existingFutureExp) {
+            await prisma.expense.update({
+              where: { id: existingFutureExp.id },
+              data: {
+                amount: futureTotal,
+                date: futureDueDate,
+              }
+            });
+          } else {
+            await prisma.expense.create({
+              data: {
+                type: 'saida',
+                category: 'fatura_cartao',
+                description: `Fatura Cartão: ${cardName} (${futureMonth})`,
+                amount: futureTotal,
+                date: futureDueDate,
+                paymentMethod: 'cartao_credito',
+                status: 'pendente',
+                creditCardInvoiceId: futureInvoice.id,
+              }
+            });
+          }
+        }
+      }
+    }
+
+    // Atualiza o total e o registro de Expense vinculado da fatura corrente
+    const allCurrentItems = await prisma.creditCardInvoiceItem.findMany({
+      where: { invoiceId: currentInvoice.id }
+    });
+    const currentTotal = allCurrentItems.reduce((acc, it) => acc + it.amount, 0);
+
+    const existingCurrentExp = await prisma.expense.findFirst({
+      where: { creditCardInvoiceId: currentInvoice.id }
+    });
+
+    if (existingCurrentExp) {
+      await prisma.expense.update({
+        where: { id: existingCurrentExp.id },
+        data: {
+          amount: currentTotal,
+          date: dueDate,
+          status: currentInvoice.status,
+        }
+      });
+    } else {
+      await prisma.expense.create({
+        data: {
+          type: 'saida',
+          category: 'fatura_cartao',
+          description: `Fatura Cartão: ${cardName} (${month})`,
+          amount: currentTotal,
+          date: dueDate,
+          paymentMethod: 'cartao_credito',
+          status: currentInvoice.status,
+          creditCardInvoiceId: currentInvoice.id,
+        }
+      });
+    }
+
+    const finalInvoice = await prisma.creditCardInvoice.findUnique({
+      where: { id: currentInvoice.id },
+      include: {
+        items: {
+          orderBy: { purchaseDate: 'asc' }
+        },
+        expenses: true,
+      }
+    });
+
+    res.json({
+      ...finalInvoice,
+      totalAmount: currentTotal
+    });
+  } catch (error: any) {
+    res.status(500).json({ error: error.message });
+  }
+});
+
 // DELETE /api/invoices/:id - Excluir fatura inteira
 router.delete('/:id', async (req: Request, res: Response) => {
   try {
